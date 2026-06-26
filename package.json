@@ -1,0 +1,30 @@
+{
+  "name": "astryx-sheet",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "An Astryx-powered virtual spreadsheet editor prototype with large-grid virtualization, formulas, selection, resizing, and ref-driven interaction loops.",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "keywords": [
+    "astryx",
+    "spreadsheet",
+    "react",
+    "virtualization",
+    "design-system"
+  ],
+  "author": "DJ Petersen",
+  "license": "MIT",
+  "dependencies": {
+    "@astryxdesign/core": "0.1.1",
+    "@astryxdesign/theme-y2k": "0.1.1",
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {}
+}
