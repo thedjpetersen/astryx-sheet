@@ -2,6 +2,12 @@ import React, {memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, u
 import {createRoot} from 'react-dom/client';
 import {Theme} from '@astryxdesign/core/theme';
 import {registerIcons} from '@astryxdesign/core/Icon';
+import {neutralTheme, neutralIconRegistry} from '@astryxdesign/theme-neutral';
+import {butterTheme, butterIconRegistry} from '@astryxdesign/theme-butter';
+import {chocolateTheme, chocolateIconRegistry} from '@astryxdesign/theme-chocolate';
+import {gothicTheme, gothicIconRegistry} from '@astryxdesign/theme-gothic';
+import {matchaTheme, matchaIconRegistry} from '@astryxdesign/theme-matcha';
+import {stoneTheme, stoneIconRegistry} from '@astryxdesign/theme-stone';
 import {y2kTheme, y2kIconRegistry} from '@astryxdesign/theme-y2k';
 import {Button} from '@astryxdesign/core/Button';
 import {Badge} from '@astryxdesign/core/Badge';
@@ -11,6 +17,7 @@ import {Text} from '@astryxdesign/core/Text';
 import {Heading} from '@astryxdesign/core/Heading';
 import {ProgressBar} from '@astryxdesign/core/ProgressBar';
 import {Switch} from '@astryxdesign/core/Switch';
+import {Selector} from '@astryxdesign/core/Selector';
 import {Token} from '@astryxdesign/core/Token';
 import {Kbd} from '@astryxdesign/core/Kbd';
 import {StatusDot} from '@astryxdesign/core/StatusDot';
@@ -19,7 +26,18 @@ import {Table, proportional, pixel} from '@astryxdesign/core/Table';
 import {useToast} from '@astryxdesign/core/Toast';
 import './styles.css';
 
-registerIcons(y2kIconRegistry);
+const THEMES = {
+  neutral: {label: 'Neutral', theme: neutralTheme, icons: neutralIconRegistry},
+  butter: {label: 'Butter', theme: butterTheme, icons: butterIconRegistry},
+  chocolate: {label: 'Chocolate', theme: chocolateTheme, icons: chocolateIconRegistry},
+  gothic: {label: 'Gothic', theme: gothicTheme, icons: gothicIconRegistry, forceDark: true},
+  matcha: {label: 'Matcha', theme: matchaTheme, icons: matchaIconRegistry},
+  stone: {label: 'Stone', theme: stoneTheme, icons: stoneIconRegistry},
+  y2k: {label: 'Y2K', theme: y2kTheme, icons: y2kIconRegistry},
+};
+const THEME_OPTIONS = Object.entries(THEMES).map(([value, theme]) => ({value, label: theme.label}));
+
+registerIcons(neutralIconRegistry);
 
 const ROWS = 100000;
 const COLS = 2000;
@@ -419,11 +437,16 @@ function Spreadsheet() {
   const [menu, setMenu] = useState({open: false, x: 0, y: 0, row: 0, col: 0});
   const [formulaPickerOpen, setFormulaPickerOpen] = useState(false);
   const [fps, setFps] = useState(60);
+  const [themeName, setThemeName] = useState('neutral');
   const [darkMode, setDarkMode] = useState(false);
   const [showInspector, setShowInspector] = useState(true);
   const [compactRows, setCompactRows] = useState(false);
   const [highContrastSelection, setHighContrastSelection] = useState(false);
   const size = useElementSize(viewportRef);
+
+  const activeTheme = THEMES[themeName] || THEMES.neutral;
+  const resolvedMode = activeTheme.forceDark ? 'dark' : darkMode ? 'dark' : 'light';
+  useEffect(() => { registerIcons(activeTheme.icons); }, [activeTheme]);
 
   const rowOverrides = rowHeightsRef.current;
   const colOverrides = colWidthsRef.current;
@@ -659,8 +682,8 @@ function Spreadsheet() {
   const editorStyle = editor ? {left: colMetrics.offset(editor.col), top: rowMetrics.offset(editor.row), width: colMetrics.size(editor.col), height: rowMetrics.size(editor.row)} : {};
 
   return (
-    <Theme theme={y2kTheme} mode={darkMode ? 'dark' : 'light'}>
-      <div className={`app ${showInspector ? '' : 'hide-inspector'} ${highContrastSelection ? 'high-contrast-selection' : ''}`} data-theme={darkMode ? 'dark' : 'light'} data-astryx-theme="y2k">
+    <Theme theme={activeTheme.theme} mode={resolvedMode}>
+      <div className={`app theme-${themeName} ${showInspector ? '' : 'hide-inspector'} ${highContrastSelection ? 'high-contrast-selection' : ''}`} data-theme={resolvedMode} data-astryx-theme={themeName}>
         <header className="topbar">
           <div className="brand-mark">✣</div>
           <div className="title">
@@ -693,7 +716,8 @@ function Spreadsheet() {
             <Button label="Taller row" variant="secondary" size="sm" onClick={() => { rowHeightsRef.current.set(activeCell.row, rowMetrics.size(activeCell.row) + 6); setDimensionVersion((v) => v + 1); }} />
             <span className="toolbar-spacer" />
             <div className="options-group" aria-label="Demo options">
-              <Switch label="Dark" value={darkMode} onChange={setDarkMode} labelPosition="start" />
+              <Selector label="Theme" isLabelHidden options={THEME_OPTIONS} value={themeName} onChange={setThemeName} size="sm" width={170} />
+              <Switch label="Dark" value={darkMode} onChange={setDarkMode} labelPosition="start" isDisabled={activeTheme.forceDark} />
               <Switch label="Inspector" value={showInspector} onChange={setShowInspector} labelPosition="start" />
               <Switch label="Compact rows" value={compactRows} onChange={setCompactRows} labelPosition="start" />
               <Switch label="High contrast" value={highContrastSelection} onChange={setHighContrastSelection} labelPosition="start" />

@@ -20,11 +20,16 @@
   "license": "MIT",
   "dependencies": {
     "@astryxdesign/core": "0.1.1",
+    "@astryxdesign/theme-butter": "^0.1.1",
+    "@astryxdesign/theme-chocolate": "^0.1.1",
+    "@astryxdesign/theme-gothic": "^0.1.1",
+    "@astryxdesign/theme-matcha": "^0.1.1",
+    "@astryxdesign/theme-neutral": "^0.1.1",
+    "@astryxdesign/theme-stone": "^0.1.1",
     "@astryxdesign/theme-y2k": "0.1.1",
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
     "react": "19.1.1",
-    "react-dom": "19.1.1"
-  },
-  "devDependencies": {}
+    "react-dom": "19.1.1",
+    "vite": "latest"
+  }
 }

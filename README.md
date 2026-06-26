@@ -4,15 +4,15 @@ Astryx Sheet is an open-source virtual spreadsheet editor prototype built with [
 
 ## Demo
 
-The live demo is published with GitHub Pages from the `docs/` directory:
+Live demo: https://thedjpetersen.github.io/astryx-sheet/
 
-https://thedjpetersen.github.io/astryx-sheet/
+![Astryx Sheet screenshot](public/screenshot.png)
 
 It demonstrates how to combine design-system primitives with high-performance spreadsheet interaction patterns: large-grid virtualization, fixed headers, editable cells, formulas, multi-cell selection, row/column resizing, and ref-driven hot paths.
 
 ## Features
 
-- Astryx Y2K theme and component primitives for the app shell, toolbar, buttons, inputs, badges, tokens, progress, status, and inspector table
+- Astryx themes and component primitives for the app shell, toolbar, buttons, inputs, badges, tokens, progress, status, and inspector table
 - 100,000 × 2,000 logical grid with a small virtualized render window
 - Fixed column header and fixed numeric row sidebar
 - Sparse `Map`-based row-height and column-width overrides
@@ -22,7 +22,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Formula evaluation for `SUM`, `AVERAGE` / `AVG`, `MIN`, `MAX`, `COUNT`, `CONCAT`, cell references, ranges, and basic arithmetic
 - Right-click context menu for edit, clear, copy, resize, and sample formula actions
 - Live inspector panel showing mounted cells, sparse overrides, effect-registered geometry, and approximate FPS
-- Demo options for dark mode, inspector visibility, compact row density, and high-contrast selection
+- Demo options for theme selection (default: Neutral), dark mode, inspector visibility, compact row density, and high-contrast selection
 
 ## Why this exists
 
