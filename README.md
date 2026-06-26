@@ -2,6 +2,12 @@
 
 Astryx Sheet is an open-source virtual spreadsheet editor prototype built with [Astryx](https://astryx.atmeta.com/), React, and Vite.
 
+## Demo
+
+The live demo is published with GitHub Pages from the `docs/` directory:
+
+https://thedjpetersen.github.io/astryx-sheet/
+
 It demonstrates how to combine design-system primitives with high-performance spreadsheet interaction patterns: large-grid virtualization, fixed headers, editable cells, formulas, multi-cell selection, row/column resizing, and ref-driven hot paths.
 
 ## Features
@@ -16,6 +22,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Formula evaluation for `SUM`, `AVERAGE` / `AVG`, `MIN`, `MAX`, `COUNT`, `CONCAT`, cell references, ranges, and basic arithmetic
 - Right-click context menu for edit, clear, copy, resize, and sample formula actions
 - Live inspector panel showing mounted cells, sparse overrides, effect-registered geometry, and approximate FPS
+- Demo options for dark mode, inspector visibility, compact row density, and high-contrast selection
 
 ## Why this exists
 
@@ -54,6 +61,7 @@ Then open the Vite URL printed in your terminal.
 ```bash
 npm run dev      # start local development
 npm run build    # production build
+npm run build && rm -rf docs && cp -R dist docs  # refresh GitHub Pages demo
 npm run preview  # preview the production build
 ```
 

@@ -17,6 +17,7 @@ import {StatusDot} from '@astryxdesign/core/StatusDot';
 import {Tooltip} from '@astryxdesign/core/Tooltip';
 import {Table, proportional, pixel} from '@astryxdesign/core/Table';
 import {useToast} from '@astryxdesign/core/Toast';
+import './styles.css';
 
 registerIcons(y2kIconRegistry);
 
@@ -419,11 +420,15 @@ function Spreadsheet() {
   const [formulaPickerOpen, setFormulaPickerOpen] = useState(false);
   const [fps, setFps] = useState(60);
   const [darkMode, setDarkMode] = useState(false);
+  const [showInspector, setShowInspector] = useState(true);
+  const [compactRows, setCompactRows] = useState(false);
+  const [highContrastSelection, setHighContrastSelection] = useState(false);
   const size = useElementSize(viewportRef);
 
   const rowOverrides = rowHeightsRef.current;
   const colOverrides = colWidthsRef.current;
-  const rowMetrics = useMemo(() => makeDimensionHelpers(DEFAULT_ROW_HEIGHT, ROWS, rowOverrides), [dimensionVersion]);
+  const effectiveRowHeight = compactRows ? 24 : DEFAULT_ROW_HEIGHT;
+  const rowMetrics = useMemo(() => makeDimensionHelpers(effectiveRowHeight, ROWS, rowOverrides), [dimensionVersion, effectiveRowHeight]);
   const colMetrics = useMemo(() => makeDimensionHelpers(DEFAULT_COL_WIDTH, COLS, colOverrides), [dimensionVersion]);
 
   const showToast = useCallback((message, type = 'info') => toast({body: message, type, isAutoHide: true}), [toast]);
@@ -655,7 +660,7 @@ function Spreadsheet() {
 
   return (
     <Theme theme={y2kTheme} mode={darkMode ? 'dark' : 'light'}>
-      <div className="app" data-theme={darkMode ? 'dark' : 'light'} data-astryx-theme="y2k">
+      <div className={`app ${showInspector ? '' : 'hide-inspector'} ${highContrastSelection ? 'high-contrast-selection' : ''}`} data-theme={darkMode ? 'dark' : 'light'} data-astryx-theme="y2k">
         <header className="topbar">
           <div className="brand-mark">✣</div>
           <div className="title">
@@ -687,8 +692,13 @@ function Spreadsheet() {
             <Button label="Widen column" variant="secondary" size="sm" onClick={() => { colWidthsRef.current.set(activeCell.col, colMetrics.size(activeCell.col) + 20); setDimensionVersion((v) => v + 1); }} />
             <Button label="Taller row" variant="secondary" size="sm" onClick={() => { rowHeightsRef.current.set(activeCell.row, rowMetrics.size(activeCell.row) + 6); setDimensionVersion((v) => v + 1); }} />
             <span className="toolbar-spacer" />
+            <div className="options-group" aria-label="Demo options">
+              <Switch label="Dark" value={darkMode} onChange={setDarkMode} labelPosition="start" />
+              <Switch label="Inspector" value={showInspector} onChange={setShowInspector} labelPosition="start" />
+              <Switch label="Compact rows" value={compactRows} onChange={setCompactRows} labelPosition="start" />
+              <Switch label="High contrast" value={highContrastSelection} onChange={setHighContrastSelection} labelPosition="start" />
+            </div>
             <div className="kbd-hint"><Kbd keys="enter" /> edit <Kbd keys="backspace" /> clear</div>
-            <Switch label="Dark" value={darkMode} onChange={setDarkMode} labelPosition="start" />
           </div>
         </header>
         <FunctionPicker open={formulaPickerOpen} activeAddress={activeAddress} formulaDraft={formulaDraft} selection={committedSelection} onPick={insertFunction} />
@@ -718,7 +728,7 @@ function Spreadsheet() {
             </div>
             <div ref={resizeGuideRef} className="resize-guide col" />
           </Card>
-          <InspectorPanel view={view} activeCell={activeCell} selection={committedSelection} rowOverrides={rowOverrides} colOverrides={colOverrides} cellMetaRef={cellMetaRef} rowMetaRef={rowMetaRef} edits={cellDataRef.current.size} fps={fps} dataRef={cellDataRef} />
+          {showInspector && <InspectorPanel view={view} activeCell={activeCell} selection={committedSelection} rowOverrides={rowOverrides} colOverrides={colOverrides} cellMetaRef={cellMetaRef} rowMetaRef={rowMetaRef} edits={cellDataRef.current.size} fps={fps} dataRef={cellDataRef} />}
         </main>
         <NativeContextMenu menu={menu} onAction={handleMenuAction} />
       </div>
