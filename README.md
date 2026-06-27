@@ -35,6 +35,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - CSV and TSV import/export helpers for embedding and data interchange
 - Workbook-level named ranges with undo/redo and snapshot serialization
 - Named ranges participate in formula dependency tracking and cached recalculation
+- Sheet filter state with criteria evaluation, visible-row selectors, undo/redo, and snapshot serialization
 - Formula evaluation for `SUM`, `AVERAGE` / `AVG`, `MIN`, `MAX`, `COUNT`, `CONCAT`, cell references, ranges, and basic arithmetic
 - Right-click context menu for edit, clear, copy, resize, and sample formula actions
 - Live inspector panel showing mounted cells, sparse overrides, effect-registered geometry, and approximate FPS

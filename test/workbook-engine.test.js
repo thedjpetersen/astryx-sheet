@@ -17,6 +17,7 @@ import {
   getCachedCellDisplayValue,
   getCellDisplayValue,
   getCellRawValue,
+  getVisibleRowsForSheet,
   getNamedRange,
   listNamedRanges,
   NumberFormatType,
@@ -251,6 +252,38 @@ test('sort range command orders rows and restores with undo', () => {
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 0), 'Ada');
   assert.equal(getCellRawValue(workbook, 'sheet-1', 2, 0), 'Grace');
   assert.equal(getCellRawValue(workbook, 'sheet-1', 3, 0), 'Linus');
+});
+
+test('filter commands track visible rows and restore with undo', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_RANGE,
+    cells: [
+      {row: 0, col: 0, value: 'Name'},
+      {row: 0, col: 1, value: 'Score'},
+      {row: 1, col: 0, value: 'Ada'},
+      {row: 1, col: 1, value: '42'},
+      {row: 2, col: 0, value: 'Grace'},
+      {row: 2, col: 1, value: '99'},
+      {row: 3, col: 0, value: 'Linus'},
+      {row: 3, col: 1, value: '7'},
+    ],
+  });
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_FILTER,
+    id: 'scores',
+    range: {r1: 0, c1: 0, r2: 3, c2: 1},
+    criteria: [{col: 1, operator: 'gte', value: 40}],
+  });
+
+  assert.deepEqual(getVisibleRowsForSheet(workbook, 'sheet-1').visibleRows, [1, 2]);
+  assert.deepEqual(getVisibleRowsForSheet(workbook, 'sheet-1').hiddenRows, [3]);
+
+  const restored = deserializeWorkbook(serializeWorkbook(workbook));
+  assert.deepEqual(getVisibleRowsForSheet(restored, 'sheet-1').visibleRows, [1, 2]);
+
+  workbook = undo(workbook);
+  assert.equal(getVisibleRowsForSheet(workbook, 'sheet-1'), null);
 });
 
 test('named ranges are undoable and survive snapshots', () => {

@@ -1,6 +1,7 @@
 import {cellKey} from '../model/address.js';
 import {normalizeSelection} from '../model/selection.js';
 import {cloneCellRecord, normalizeCellRecord} from './cells.js';
+import {cloneFilter, createFilter} from './filters.js';
 import {mergeCellFormat} from './formatting.js';
 import {cloneNamedRange, createNamedRange, normalizeName} from './names.js';
 import {cloneSheet, cloneWorkbook, createSheet, getSheet, setCellRecord, withClonedSheet} from './workbook.js';
@@ -12,6 +13,8 @@ export const CommandType = {
   CLEAR_RANGE: 'CLEAR_RANGE',
   SET_RANGE_FORMAT: 'SET_RANGE_FORMAT',
   SORT_RANGE: 'SORT_RANGE',
+  SET_FILTER: 'SET_FILTER',
+  CLEAR_FILTER: 'CLEAR_FILTER',
   RESIZE_ROW: 'RESIZE_ROW',
   RESIZE_COLUMN: 'RESIZE_COLUMN',
   ADD_SHEET: 'ADD_SHEET',
@@ -203,6 +206,33 @@ function applySortRange(workbook, command) {
   };
 }
 
+function applySetFilter(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const filter = createFilter(command.filter || command);
+  const oldFilter = cloneFilter(getSheet(workbook, sheetId).filters.get(filter.id));
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
+    sheet.filters.set(filter.id, filter);
+  });
+  return {
+    workbook: nextWorkbook,
+    inverse: oldFilter
+      ? {type: CommandType.SET_FILTER, sheetId, filter: oldFilter}
+      : {type: CommandType.CLEAR_FILTER, sheetId, id: filter.id},
+  };
+}
+
+function applyClearFilter(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const oldFilter = cloneFilter(getSheet(workbook, sheetId).filters.get(command.id || 'filter-1'));
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
+    sheet.filters.delete(command.id || 'filter-1');
+  });
+  return {
+    workbook: nextWorkbook,
+    inverse: oldFilter ? {type: CommandType.SET_FILTER, sheetId, filter: oldFilter} : {type: CommandType.CLEAR_FILTER, sheetId, id: command.id || 'filter-1'},
+  };
+}
+
 function applyResizeDimension(workbook, command, kind) {
   const sheetId = command.sheetId || workbook.activeSheetId;
   const mapName = kind === 'row' ? 'rowHeights' : 'colWidths';
@@ -307,6 +337,8 @@ export function applyWorkbookCommand(workbook, command) {
   if (command.type === CommandType.CLEAR_RANGE) return applyClearRange(workbook, command);
   if (command.type === CommandType.SET_RANGE_FORMAT) return applySetRangeFormat(workbook, command);
   if (command.type === CommandType.SORT_RANGE) return applySortRange(workbook, command);
+  if (command.type === CommandType.SET_FILTER) return applySetFilter(workbook, command);
+  if (command.type === CommandType.CLEAR_FILTER) return applyClearFilter(workbook, command);
   if (command.type === CommandType.RESIZE_ROW) return applyResizeDimension(workbook, command, 'row');
   if (command.type === CommandType.RESIZE_COLUMN) return applyResizeDimension(workbook, command, 'col');
   if (command.type === CommandType.ADD_SHEET) return applyAddSheet(workbook, command);

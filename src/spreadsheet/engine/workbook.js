@@ -3,6 +3,7 @@ import {DEFAULT_GRID_CONFIG} from '../model/constants.js';
 import {defaultCellValue} from '../model/defaultData.js';
 import {displayCellValue} from '../model/formulas.js';
 import {cellRecordToRaw, cellRecordToSerializable, cloneCellRecord, normalizeCellRecord} from './cells.js';
+import {cloneFilter, createFilterStore} from './filters.js';
 import {formatValue} from './formatting.js';
 import {cloneNamedRange, createNamedRangeStore} from './names.js';
 
@@ -48,6 +49,7 @@ export function createSheet(input = {}) {
     cells: createCellStore(input.cells),
     rowHeights: createDimensionStore(input.rowHeights),
     colWidths: createDimensionStore(input.colWidths),
+    filters: createFilterStore(input.filters),
     metadata: input.metadata ? {...input.metadata} : {},
   };
 }
@@ -58,6 +60,7 @@ export function cloneSheet(sheet) {
     cells: new Map(Array.from(sheet.cells.entries(), ([key, cell]) => [key, cloneCellRecord(cell)])),
     rowHeights: new Map(sheet.rowHeights),
     colWidths: new Map(sheet.colWidths),
+    filters: new Map(Array.from(sheet.filters.entries(), ([id, filter]) => [id, cloneFilter(filter)])),
     metadata: {...sheet.metadata},
   };
 }
@@ -169,6 +172,7 @@ export function serializeSheetForSnapshot(sheet) {
     cells: Array.from(sheet.cells.entries(), ([key, cell]) => [key, cellRecordToSerializable(cell)]),
     rowHeights: Array.from(sheet.rowHeights.entries()),
     colWidths: Array.from(sheet.colWidths.entries()),
+    filters: Array.from(sheet.filters.values()).map(cloneFilter),
     metadata: {...sheet.metadata},
   };
 }
