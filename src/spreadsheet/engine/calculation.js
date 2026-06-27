@@ -3,6 +3,7 @@ import {defaultCellValue} from '../model/defaultData.js';
 import {evaluateFormula, formatFormulaResult} from '../model/formulas.js';
 import {dispatchCommand, getChangedCellKeysForCommand, getCommandSheetId} from './commands.js';
 import {getFormulaRecalculationOrder} from './dependencies.js';
+import {expandNamedRangesInFormula} from './names.js';
 import {cloneSheet, cloneWorkbook, createSheetDataRef, getSheet} from './workbook.js';
 
 function formulaKeysForSheet(sheet) {
@@ -19,7 +20,8 @@ export function evaluateCellForCache(sheet, key, options = {}) {
   if (!cell?.formula) return undefined;
   const {row, col} = parseCellKey(key);
   const getDefaultCellValue = options.getDefaultCellValue || defaultCellValue;
-  return evaluateFormula(cell.formula, createSheetDataRef(sheet), {row, col}, getDefaultCellValue);
+  const formula = expandNamedRangesInFormula(cell.formula, options.namedRanges, options.sheetId || sheet.id);
+  return evaluateFormula(formula, createSheetDataRef(sheet), {row, col}, getDefaultCellValue);
 }
 
 export function recalculateSheet(sheet, options = {}) {
@@ -49,7 +51,7 @@ export function recalculateSheet(sheet, options = {}) {
 export function recalculateWorkbook(workbook, options = {}) {
   const sheetId = options.sheetId || workbook.activeSheetId;
   const currentSheet = getSheet(workbook, sheetId);
-  const result = recalculateSheet(currentSheet, options);
+  const result = recalculateSheet(currentSheet, {...options, sheetId, namedRanges: options.namedRanges || workbook.namedRanges});
   const nextWorkbook = cloneWorkbook(workbook);
   nextWorkbook.sheets.set(sheetId, result.sheet);
   nextWorkbook.version = workbook.version + 1;
@@ -74,6 +76,7 @@ export function dispatchCommandWithRecalculation(workbook, command, options = {}
     ...recalculateWorkbook(nextWorkbook, {
       ...options,
       sheetId: options.sheetId || getCommandSheetId(nextWorkbook, command),
+      namedRanges: nextWorkbook.namedRanges,
       changedKeys,
     }),
     changedKeys,

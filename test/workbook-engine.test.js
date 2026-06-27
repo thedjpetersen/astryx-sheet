@@ -10,6 +10,7 @@ import {
   deserializeWorkbook,
   dispatchCommand,
   dispatchCommandWithRecalculation,
+  expandNamedRangesInFormula,
   extractFormulaReferences,
   getChangedCellKeysForCommand,
   getFormulaRecalculationOrder,
@@ -271,6 +272,34 @@ test('named ranges are undoable and survive snapshots', () => {
 
   const restored = deserializeWorkbook(serializeWorkbook(workbook));
   assert.deepEqual(getNamedRange(restored, 'Revenue').range, {r1: 1, c1: 1, r2: 10, c2: 4});
+});
+
+test('named ranges participate in formula recalculation dependencies', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_NAMED_RANGE,
+    name: 'Inputs',
+    sheetId: 'sheet-1',
+    range: {r1: 0, c1: 0, r2: 1, c2: 0},
+  });
+  let result = dispatchCommandWithRecalculation(workbook, {
+    type: CommandType.SET_RANGE,
+    cells: [
+      {row: 0, col: 0, value: '2'},
+      {row: 1, col: 0, value: '3'},
+      {row: 0, col: 1, formula: '=SUM(Inputs)'},
+    ],
+  });
+  workbook = result.workbook;
+
+  assert.equal(expandNamedRangesInFormula('=SUM(Inputs)', workbook.namedRanges, 'sheet-1'), '=SUM(A1:A2)');
+  assert.equal(getCachedCellDisplayValue(workbook.sheets.get('sheet-1'), 0, 1), '5');
+
+  result = dispatchCommandWithRecalculation(workbook, {type: CommandType.SET_CELL, row: 0, col: 0, value: '10'});
+  workbook = result.workbook;
+
+  assert.deepEqual(result.recalculated, ['0:1']);
+  assert.equal(getCachedCellDisplayValue(workbook.sheets.get('sheet-1'), 0, 1), '13');
 });
 
 test('explicit blank cells can override generated defaults', () => {

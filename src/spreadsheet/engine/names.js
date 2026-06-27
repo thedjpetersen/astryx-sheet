@@ -1,3 +1,5 @@
+import {cellAddress} from '../model/address.js';
+
 export function normalizeName(name) {
   return String(name || '').trim();
 }
@@ -38,4 +40,23 @@ export function getNamedRange(workbook, name) {
 
 export function listNamedRanges(workbook) {
   return Array.from(workbook.namedRanges.values()).map(cloneNamedRange);
+}
+
+export function rangeToFormulaReference(range) {
+  return `${cellAddress(range.r1, range.c1)}:${cellAddress(range.r2, range.c2)}`;
+}
+
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function expandNamedRangesInFormula(formula, namedRanges, sheetId) {
+  let text = String(formula ?? '');
+  const ranges = namedRanges instanceof Map ? Array.from(namedRanges.values()) : namedRanges || [];
+  for (const namedRange of ranges.sort((a, b) => b.name.length - a.name.length)) {
+    if (namedRange.sheetId && sheetId && namedRange.sheetId !== sheetId) continue;
+    const pattern = new RegExp(`(^|[^A-Z0-9_])(${escapeRegExp(namedRange.name)})(?=[^A-Z0-9_]|$)`, 'gi');
+    text = text.replace(pattern, (_match, prefix) => `${prefix}${rangeToFormulaReference(namedRange.range)}`);
+  }
+  return text;
 }

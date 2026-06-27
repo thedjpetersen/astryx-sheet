@@ -24,6 +24,7 @@
 - Added toolbar actions for sorting the current selection by the active column through the recalculating engine path.
 - Added CSV/TSV delimited text import/export helpers and routed TSV clipboard parsing through the shared adapter.
 - Added workbook-level named ranges with command history and snapshot serialization.
+- Integrated named ranges into formula expansion, dependency discovery, and cached recalculation.
 
 ## Current Direction
 
@@ -32,4 +33,4 @@ The package should grow around two public layers:
 - A workbook engine that can run without React and eventually own Excel-scale state, formulas, commands, history, import/export, and collaboration hooks.
 - A virtualized React grid that consumes the engine and can be embedded with or without the Astryx toolbar and themes.
 
-The next implementation pass should integrate named ranges into formula parsing and add richer paste semantics for formatting-oriented external clipboard payloads and larger ranges.
+The next implementation pass should add richer paste semantics for formatting-oriented external clipboard payloads and larger ranges.

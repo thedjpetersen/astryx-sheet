@@ -1,4 +1,5 @@
 import {cellAddress, cellKey, parseCellAddress, parseRange} from '../model/address.js';
+import {expandNamedRangesInFormula} from './names.js';
 
 const REF_PATTERN = /(\$?[A-Z]+\$?\d+)(?:\s*:\s*(\$?[A-Z]+\$?\d+))?/gi;
 
@@ -14,7 +15,7 @@ function addReference(refs, row, col) {
 export function extractFormulaReferences(formula, options = {}) {
   const refs = new Map();
   const maxRangeCells = options.maxRangeCells || 10000;
-  const text = String(formula ?? '').replace(/^=/, '');
+  const text = expandNamedRangesInFormula(formula, options.namedRanges, options.sheetId).replace(/^=/, '');
   for (const match of text.matchAll(REF_PATTERN)) {
     const startRef = stripAbsoluteMarkers(match[1]);
     const endRef = match[2] ? stripAbsoluteMarkers(match[2]) : null;
