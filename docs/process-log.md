@@ -37,6 +37,7 @@
 - Added `initialMerges` support and virtual-grid rendering for workbook merged ranges.
 - Added toolbar commands for creating and clearing workbook merge and validation metadata through the engine history.
 - Added a headless workbook controller for non-React embedding with subscriptions, command dispatch, recalculation, history, and snapshots.
+- Added HTML table clipboard import/export helpers and made React copy/paste prefer `text/html` when the browser clipboard exposes it.
 
 ## Current Direction
 
@@ -45,4 +46,4 @@ The package should grow around two public layers:
 - A workbook engine that can run without React and eventually own Excel-scale state, formulas, commands, history, import/export, and collaboration hooks.
 - A virtualized React grid that consumes the engine and can be embedded with or without the Astryx toolbar and themes.
 
-The next implementation pass should add richer paste semantics for formatting-oriented external clipboard payloads and larger ranges, then broaden controller-level adapters for host persistence and collaboration.
+The next implementation pass should broaden controller-level adapters for host persistence and collaboration, then continue expanding formula and file-format coverage.

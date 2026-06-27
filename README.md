@@ -22,6 +22,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Editable cells via double-click, `Enter`, typing, formula bar, and context menu
 - Undo/redo command history for engine-backed cell edits and clears
 - Engine-backed copy/paste for TSV selection data
+- Engine-backed HTML table clipboard import/export for richer external spreadsheet paste payloads
 - Grouped workbook commands and range-copy helpers for compound undo, metadata-preserving copies, and relative formula translation
 - Formula dependency graph utilities for dirty-cell discovery and recalculation ordering
 - Cached recalculation helpers for full-sheet and dirty-formula updates
@@ -32,7 +33,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - React toolbar actions for applying common engine-backed number formats to the current selection
 - Undoable engine range sorting with header-aware, numeric, date, and text comparison
 - React toolbar actions for sorting the selected range by the active column
-- CSV and TSV import/export helpers for embedding and data interchange
+- CSV, TSV, and HTML table import/export helpers for embedding and data interchange
 - Workbook-level named ranges with undo/redo and snapshot serialization
 - Named ranges participate in formula dependency tracking and cached recalculation
 - Multi-sheet workbook commands for adding, activating, renaming, and removing sheets with undo/redo

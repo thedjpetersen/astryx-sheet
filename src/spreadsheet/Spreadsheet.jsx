@@ -12,7 +12,7 @@ import {NativeContextMenu} from './components/NativeContextMenu.jsx';
 import {RowFragment} from './components/RowFragment.jsx';
 import {SheetTabs} from './components/SheetTabs.jsx';
 import {SpreadsheetToolbar} from './components/SpreadsheetToolbar.jsx';
-import {CommandType, NumberFormatType, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, getCellRawValue, getMergeAtCell, getValidationRulesForCell, getVisibleRowsForSheet, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook, validateCellValue} from './engine/index.js';
+import {CommandType, NumberFormatType, createImportHtmlTableCommand, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, getCellRawValue, getMergeAtCell, getValidationRulesForCell, getVisibleRowsForSheet, rangeToHtmlTable, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook, validateCellValue} from './engine/index.js';
 import {cellAddress, cellKey, columnName} from './model/address.js';
 import {DEFAULT_GRID_CONFIG} from './model/constants.js';
 import {createDefaultCellData, createDefaultColWidths, createDefaultRowHeights, defaultCellValue} from './model/defaultData.js';
@@ -295,26 +295,42 @@ export function Spreadsheet({
     commitWorkbookStructureCommand({type: CommandType.REMOVE_SHEET, sheetId: sheet.id, label: `Remove ${sheet.name}`}, `Removed ${sheet.name}`);
   }, [commitWorkbookStructureCommand, showToast]);
   const copySelectionToClipboard = useCallback(() => {
-    if (!navigator.clipboard?.writeText) {
+    if (!navigator.clipboard?.writeText && !navigator.clipboard?.write) {
       showToast('Clipboard blocked', 'error');
       return;
     }
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     const text = rangeToTsv(workbookRef.current, selection, {getDefaultCellValue});
-    navigator.clipboard.writeText(text).then(
-      () => showToast(`Copied ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`),
-      () => showToast('Clipboard blocked', 'error'),
-    );
+    const html = rangeToHtmlTable(workbookRef.current, selection, {getDefaultCellValue});
+    const onCopied = () => showToast(`Copied ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`);
+    const writePlainText = () => {
+      if (!navigator.clipboard.writeText) {
+        showToast('Clipboard blocked', 'error');
+        return;
+      }
+      navigator.clipboard.writeText(text).then(onCopied, () => showToast('Clipboard blocked', 'error'));
+    };
+    if (navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+      const item = new ClipboardItem({
+        'text/plain': new Blob([text], {type: 'text/plain'}),
+        'text/html': new Blob([html], {type: 'text/html'}),
+      });
+      navigator.clipboard.write([item]).then(
+        onCopied,
+        writePlainText,
+      );
+      return;
+    }
+    writePlainText();
   }, [activeCell, committedSelection, getDefaultCellValue, showToast]);
   const pasteClipboardAtActiveCell = useCallback(() => {
-    if (!navigator.clipboard?.readText) {
+    if (!navigator.clipboard?.readText && !navigator.clipboard?.read) {
       showToast('Clipboard blocked', 'error');
       return;
     }
-    navigator.clipboard.readText().then((text) => {
-      if (!text) return;
-      const command = createPasteTsvCommand(text, activeCell);
-      if (!validateEditCells(command.cells || [])) return;
+    const applyPasteCommand = (command, message) => {
+      if (!command.cells?.length) return false;
+      if (!validateEditCells(command.cells)) return true;
       const result = dispatchCommandWithRecalculation(workbookRef.current, command, {getDefaultCellValue});
       const nextWorkbook = result.workbook;
       workbookRef.current = nextWorkbook;
@@ -322,8 +338,38 @@ export function Spreadsheet({
       setDataVersion((v) => v + 1);
       syncFormulaDraftFromWorkbook(nextWorkbook);
       emitWorkbookChange(nextWorkbook, {source: 'clipboard', command, recalculated: result.recalculated});
-      showToast('Pasted cells');
-    }, () => showToast('Clipboard blocked', 'error'));
+      showToast(message);
+      return true;
+    };
+    const pastePlainText = () => {
+      if (!navigator.clipboard.readText) {
+        showToast('Clipboard blocked', 'error');
+        return;
+      }
+      navigator.clipboard.readText().then((text) => {
+        if (!text) return;
+        const command = createPasteTsvCommand(text, activeCell);
+        applyPasteCommand(command, 'Pasted cells');
+      }, () => showToast('Clipboard blocked', 'error'));
+    };
+    if (navigator.clipboard.read) {
+      navigator.clipboard.read().then(async (items) => {
+        try {
+          for (const item of items) {
+            if (!item.types?.includes('text/html')) continue;
+            const html = await item.getType('text/html').then((blob) => blob.text());
+            const command = createImportHtmlTableCommand(html, activeCell, {label: 'Paste HTML table'});
+            if (applyPasteCommand(command, 'Pasted table')) return;
+          }
+        } catch {
+          pastePlainText();
+          return;
+        }
+        pastePlainText();
+      }, pastePlainText);
+      return;
+    }
+    pastePlainText();
   }, [activeCell, emitWorkbookChange, getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook, validateEditCells]);
   const setActiveCell = useCallback((point) => {
     const nextPoint = clampPoint(point, gridConfig);

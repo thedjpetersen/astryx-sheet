@@ -5,6 +5,7 @@ import {
   CommandType,
   createCopyRangeCommand,
   createImportDelimitedCommand,
+  createImportHtmlTableCommand,
   createPasteTsvCommand,
   createWorkbook,
   createWorkbookController,
@@ -25,8 +26,10 @@ import {
   listNamedRanges,
   NumberFormatType,
   parseDelimited,
+  parseHtmlTable,
   recalculateWorkbook,
   rangeToDelimited,
+  rangeToHtmlTable,
   rangeToTsv,
   redo,
   serializeWorkbook,
@@ -203,6 +206,23 @@ test('delimited import and export handle csv quoting', () => {
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 1), 'quote "inside"');
   assert.equal(getCellRawValue(workbook, 'sheet-1', 2, 1), 'line, comma');
   assert.equal(rangeToDelimited(workbook, {r1: 0, c1: 0, r2: 2, c2: 1}), 'Name,Note\nAda,"quote ""inside"""\nGrace,"line, comma"');
+});
+
+test('html table import and export support clipboard-shaped tables', () => {
+  const html = '<table><tbody><tr><th>Name</th><th>Score</th></tr><tr><td rowspan="2">Ada&nbsp;L.</td><td>42</td></tr><tr><td>43 &amp; rising</td></tr></tbody></table>';
+  assert.deepEqual(parseHtmlTable(html), [
+    ['Name', 'Score'],
+    ['Ada L.', '42'],
+    ['', '43 & rising'],
+  ]);
+
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, createImportHtmlTableCommand(html, {row: 1, col: 1}));
+
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 1), 'Name');
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 2, 1), 'Ada L.');
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 3, 2), '43 & rising');
+  assert.equal(rangeToHtmlTable(workbook, {r1: 1, c1: 1, r2: 1, c2: 2}), '<table><tbody><tr><td>Name</td><td>Score</td></tr></tbody></table>');
 });
 
 test('copy range command preserves metadata and translates relative formulas', () => {
