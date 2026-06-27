@@ -274,13 +274,15 @@ export function dispatchCommandWithRecalculation(workbook, command, options = {}
   const changedKeys = getChangedCellKeysForCommand(command);
   const fullRecalculation = commandRequiresFullRecalculation(command);
   const nextWorkbook = dispatchCommand(workbook, command);
+  const commandSheetId = getCommandSheetId(nextWorkbook, command);
+  const recalculationSheetId = nextWorkbook.sheets.has(commandSheetId) ? commandSheetId : nextWorkbook.activeSheetId;
   if (options.recalculate === false || (!changedKeys.size && !fullRecalculation)) {
     return {workbook: nextWorkbook, changedKeys, recalculated: []};
   }
   return {
     ...recalculateWorkbook(nextWorkbook, {
       ...options,
-      sheetId: options.sheetId || getCommandSheetId(nextWorkbook, command),
+      sheetId: options.sheetId || recalculationSheetId,
       namedRanges: nextWorkbook.namedRanges,
       changedKeys: fullRecalculation ? null : changedKeys,
       allSheets: options.allSheets ?? true,

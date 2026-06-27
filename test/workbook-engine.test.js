@@ -404,6 +404,26 @@ test('sheet commands create unique ids and restore active sheet history', () => 
   assert.throws(() => dispatchCommand(workbook, {type: CommandType.ADD_SHEET, sheet: {id: 'sheet-1'}}), /already exists/);
 });
 
+test('controller sheet removal recalculates against a surviving active sheet', () => {
+  const controller = createWorkbookController({
+    sheets: [
+      {id: 'sheet-1', name: 'Inputs', cells: {'0:0': {value: '2'}}},
+      {id: 'sheet-2', name: 'Calc', cells: {'0:0': {formula: '=1+1'}}},
+    ],
+    activeSheetId: 'sheet-2',
+  });
+  const events = [];
+  controller.subscribe((event) => events.push(event));
+
+  const result = controller.dispatch({type: CommandType.REMOVE_SHEET, sheetId: 'sheet-2', label: 'Remove Calc'});
+
+  assert.equal(result.workbook.activeSheetId, 'sheet-1');
+  assert.equal(result.workbook.sheets.has('sheet-2'), false);
+  assert.deepEqual(Object.keys(result.recalculatedBySheet), ['sheet-1']);
+  assert.equal(events.at(-1).activeSheetId, 'sheet-1');
+  assert.equal(events.at(-1).activeSheet.name, 'Inputs');
+});
+
 test('range clear and TSV paste are command-compatible', () => {
   let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
   workbook = dispatchCommand(workbook, createPasteTsvCommand('Name\tScore\nAda\t42', {row: 0, col: 0}));

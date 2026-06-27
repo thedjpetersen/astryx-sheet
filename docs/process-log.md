@@ -142,6 +142,7 @@
 - Added Excel-compatible `TEXTSPLIT` as a spillable text formula, including row/column delimiters, empty-value suppression, case-insensitive matching, padding, picker metadata, and nested numeric consumption.
 - Added dynamic-array `SORTBY` and volatile `RANDARRAY` evaluation, including multi-key sort vectors, deterministic random testing hooks, picker templates, diagnostics, and spill-aware recalculation coverage.
 - Added Vite-backed UI component wiring tests for toolbar commands, formula-editor prop forwarding, view controls, context-menu actions, sheet tabs, function picker rendering, and cell state rendering.
+- Fixed mounted UI wiring gaps found during browser smoke testing: context-menu item clicks now reach spreadsheet actions, removing the active sheet recalculates against the surviving sheet, and formula-bar styles avoid React shorthand/longhand conflicts.
 
 ## Current Direction
 

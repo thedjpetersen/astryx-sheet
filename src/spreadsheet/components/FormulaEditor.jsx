@@ -44,7 +44,9 @@ const styles = Object.freeze({
     alignItems: 'center',
     gap: 0,
     minHeight: 32,
-    border: '1px solid var(--color-border)',
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: 'var(--color-border)',
     backgroundColor: 'var(--color-background-surface)',
   },
   rootFocused: {
@@ -85,7 +87,9 @@ const styles = Object.freeze({
     display: 'inline-flex',
     alignItems: 'center',
     paddingInline: 2,
-    borderRight: '1px solid var(--color-border)',
+    borderRightWidth: 1,
+    borderRightStyle: 'solid',
+    borderRightColor: 'var(--color-border)',
     backgroundColor: 'var(--color-background-surface)',
   },
   editControlsHidden: {

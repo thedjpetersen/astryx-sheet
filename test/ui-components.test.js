@@ -409,6 +409,12 @@ test('native context menu exposes every spreadsheet action', async () => {
     menu: {open: true, x: 12, y: 24},
     onAction: (action) => actions.push(action),
   });
+  const pointerCalls = [];
+  menu.props.onPointerDown({
+    preventDefault: () => pointerCalls.push('preventDefault'),
+    stopPropagation: () => pointerCalls.push('stopPropagation'),
+  });
+  assert.deepEqual(pointerCalls, ['preventDefault', 'stopPropagation']);
   const buttons = collectElements(menu, (element) => element.type === 'button');
   const expectedActions = [
     'edit',
