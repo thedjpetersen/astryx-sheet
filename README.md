@@ -47,6 +47,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Live inspector panel showing mounted cells, sparse overrides, effect-registered geometry, and approximate FPS
 - Demo options for theme selection (default: Neutral), dark mode, inspector visibility, compact row density, and high-contrast selection
 - Embeddable source package exports for the React `Spreadsheet` component and a React-independent workbook engine
+- `onWorkbookChange` callback for host applications that need workbook state after cell, sheet, history, format, filter, sort, clipboard, or resize commands
 - Workbook engine primitives for sparse sheets, active-sheet state, cells, formulas, commands, undo/redo, TSV clipboard data, and JSON snapshots
 
 ## Why this exists

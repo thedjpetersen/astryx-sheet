@@ -68,6 +68,7 @@ export function Spreadsheet({
   withTheme = true,
   className = '',
   onCellChange,
+  onWorkbookChange,
   onSelectionChange,
   onActiveCellChange,
 }) {
@@ -164,6 +165,16 @@ export function Spreadsheet({
   const colMetrics = useMemo(() => makeDimensionHelpers(defaultColWidth, colCount, colOverrides), [dimensionVersion, defaultColWidth, colCount, colOverrides]);
 
   const showToast = useCallback((message, type = 'info') => toast({body: message, type, isAutoHide: true}), [toast]);
+  const emitWorkbookChange = useCallback((nextWorkbook, detail = {}) => {
+    onWorkbookChange?.({
+      workbook: nextWorkbook,
+      activeSheet: getActiveSheet(nextWorkbook),
+      activeSheetId: nextWorkbook.activeSheetId,
+      sheetOrder: [...nextWorkbook.sheetOrder],
+      version: nextWorkbook.version,
+      ...detail,
+    });
+  }, [onWorkbookChange]);
   const syncFormulaDraftFromWorkbook = useCallback((nextWorkbook, point = activeCell) => {
     setFormulaDraft(readCell(createSheetDataRef(getActiveSheet(nextWorkbook)), point.row, point.col, getDefaultCellValue));
   }, [activeCell, getDefaultCellValue]);
@@ -177,12 +188,14 @@ export function Spreadsheet({
     setDataVersion((v) => v + 1);
     setDimensionVersion((v) => v + 1);
     syncFormulaDraftFromWorkbook(nextWorkbook);
+    emitWorkbookChange(nextWorkbook, {source: 'history', action: label.toLowerCase()});
     showToast(label);
-  }, [getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook]);
+  }, [emitWorkbookChange, getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook]);
   const undoLastCommand = useCallback(() => navigateHistory(undoWorkbook, 'Undo'), [navigateHistory]);
   const redoLastCommand = useCallback(() => navigateHistory(redoWorkbook, 'Redo'), [navigateHistory]);
   const commitWorkbookStructureCommand = useCallback((command, toastMessage) => {
     const nextWorkbook = dispatchCommand(workbookRef.current, command);
+    const committedEntry = nextWorkbook.history[nextWorkbook.history.length - 1];
     workbookRef.current = nextWorkbook;
     setWorkbook(nextWorkbook);
     setDataVersion((v) => v + 1);
@@ -191,9 +204,10 @@ export function Spreadsheet({
     setEditor(null);
     setMenu((m) => ({...m, open: false}));
     setFormulaPickerOpen(false);
+    emitWorkbookChange(nextWorkbook, {source: 'structure', command: committedEntry?.command || command});
     if (toastMessage) showToast(toastMessage);
     return nextWorkbook;
-  }, [showToast, syncFormulaDraftFromWorkbook]);
+  }, [emitWorkbookChange, showToast, syncFormulaDraftFromWorkbook]);
   const activateSheet = useCallback((sheetId) => {
     const currentWorkbook = workbookRef.current;
     if (sheetId === currentWorkbook.activeSheetId) return;
@@ -252,15 +266,17 @@ export function Spreadsheet({
     }
     navigator.clipboard.readText().then((text) => {
       if (!text) return;
-      const result = dispatchCommandWithRecalculation(workbookRef.current, createPasteTsvCommand(text, activeCell), {getDefaultCellValue});
+      const command = createPasteTsvCommand(text, activeCell);
+      const result = dispatchCommandWithRecalculation(workbookRef.current, command, {getDefaultCellValue});
       const nextWorkbook = result.workbook;
       workbookRef.current = nextWorkbook;
       setWorkbook(nextWorkbook);
       setDataVersion((v) => v + 1);
       syncFormulaDraftFromWorkbook(nextWorkbook);
+      emitWorkbookChange(nextWorkbook, {source: 'clipboard', command, recalculated: result.recalculated});
       showToast('Pasted cells');
     }, () => showToast('Clipboard blocked', 'error'));
-  }, [activeCell, getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook]);
+  }, [activeCell, emitWorkbookChange, getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook]);
   const setActiveCell = useCallback((point) => {
     const nextPoint = clampPoint(point, gridConfig);
     setActiveCellState(nextPoint);
@@ -272,15 +288,15 @@ export function Spreadsheet({
   }, [onSelectionChange]);
   const setCell = useCallback((row, col, value) => {
     const nextCell = value === getDefaultCellValue(row, col) ? null : value;
-    setWorkbook((currentWorkbook) => {
-      const result = dispatchCommandWithRecalculation(currentWorkbook, {type: CommandType.SET_CELL, row, col, cell: nextCell}, {getDefaultCellValue});
-      const nextWorkbook = result.workbook;
-      workbookRef.current = nextWorkbook;
-      onCellChange?.({row, col, address: cellAddress(row, col), value, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook, recalculated: result.recalculated});
-      return nextWorkbook;
-    });
+    const command = {type: CommandType.SET_CELL, row, col, cell: nextCell};
+    const result = dispatchCommandWithRecalculation(workbookRef.current, command, {getDefaultCellValue});
+    const nextWorkbook = result.workbook;
+    workbookRef.current = nextWorkbook;
+    setWorkbook(nextWorkbook);
+    onCellChange?.({row, col, address: cellAddress(row, col), value, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook, recalculated: result.recalculated});
+    emitWorkbookChange(nextWorkbook, {source: 'cell', command, recalculated: result.recalculated});
     setDataVersion((v) => v + 1);
-  }, [getDefaultCellValue, onCellChange]);
+  }, [emitWorkbookChange, getDefaultCellValue, onCellChange]);
   const registerCell = useCallback((row, col, rect) => {
     const key = cellKey(row, col);
     if (rect) cellMetaRef.current.set(key, rect);
@@ -342,33 +358,33 @@ export function Spreadsheet({
     if (count > 50000) return showToast('Selection too large for demo clear', 'error');
     const cells = [];
     for (let r = selection.r1; r <= selection.r2; r++) for (let c = selection.c1; c <= selection.c2; c++) cells.push({row: r, col: c, cell: {value: ''}});
-    setWorkbook((currentWorkbook) => {
-      const result = dispatchCommandWithRecalculation(currentWorkbook, {type: CommandType.SET_RANGE, cells}, {getDefaultCellValue});
-      const nextWorkbook = result.workbook;
-      workbookRef.current = nextWorkbook;
-      onCellChange?.({selection, value: '', cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook, recalculated: result.recalculated});
-      return nextWorkbook;
-    });
+    const command = {type: CommandType.SET_RANGE, cells};
+    const result = dispatchCommandWithRecalculation(workbookRef.current, command, {getDefaultCellValue});
+    const nextWorkbook = result.workbook;
+    workbookRef.current = nextWorkbook;
+    setWorkbook(nextWorkbook);
+    onCellChange?.({selection, value: '', cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook, recalculated: result.recalculated});
+    emitWorkbookChange(nextWorkbook, {source: 'range-clear', command, recalculated: result.recalculated});
     setDataVersion((v) => v + 1);
     if (activeCell.row >= selection.r1 && activeCell.row <= selection.r2 && activeCell.col >= selection.c1 && activeCell.col <= selection.c2) setFormulaDraft('');
     showToast(`Cleared ${count.toLocaleString()} cell${count === 1 ? '' : 's'}`);
-  }, [committedSelection, activeCell, getDefaultCellValue, showToast, onCellChange]);
+  }, [committedSelection, activeCell, emitWorkbookChange, getDefaultCellValue, showToast, onCellChange]);
   const formatSelection = useCallback((format, label) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
-    setWorkbook((currentWorkbook) => {
-      const nextWorkbook = dispatchCommand(currentWorkbook, {
-        type: CommandType.SET_RANGE_FORMAT,
-        range: selection,
-        format,
-        label: `Format ${label}`,
-      });
-      workbookRef.current = nextWorkbook;
-      onCellChange?.({selection, format, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
-      return nextWorkbook;
-    });
+    const command = {
+      type: CommandType.SET_RANGE_FORMAT,
+      range: selection,
+      format,
+      label: `Format ${label}`,
+    };
+    const nextWorkbook = dispatchCommand(workbookRef.current, command);
+    workbookRef.current = nextWorkbook;
+    setWorkbook(nextWorkbook);
+    onCellChange?.({selection, format, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
+    emitWorkbookChange(nextWorkbook, {source: 'format', command});
     setDataVersion((v) => v + 1);
     showToast(`Formatted ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)} as ${label}`);
-  }, [activeCell, committedSelection, onCellChange, showToast]);
+  }, [activeCell, committedSelection, emitWorkbookChange, onCellChange, showToast]);
   const sortSelection = useCallback((direction) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     if (selection.r2 <= selection.r1) {
@@ -389,8 +405,9 @@ export function Spreadsheet({
     setDataVersion((v) => v + 1);
     syncFormulaDraftFromWorkbook(result.workbook);
     onCellChange?.({selection, sort: {col: sortCol, direction}, cells: getActiveSheet(result.workbook).cells, workbook: result.workbook, recalculated: result.recalculated});
+    emitWorkbookChange(result.workbook, {source: 'sort', command, recalculated: result.recalculated});
     showToast(direction === 'asc' ? 'Sorted ascending' : 'Sorted descending');
-  }, [activeCell, committedSelection, getDefaultCellValue, onCellChange, showToast, syncFormulaDraftFromWorkbook]);
+  }, [activeCell, committedSelection, emitWorkbookChange, getDefaultCellValue, onCellChange, showToast, syncFormulaDraftFromWorkbook]);
   const filterSelectionByActiveValue = useCallback(() => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     if (selection.r2 <= selection.r1) {
@@ -412,52 +429,53 @@ export function Spreadsheet({
     setWorkbook(nextWorkbook);
     setDimensionVersion((v) => v + 1);
     onCellChange?.({selection, filter: command, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
+    emitWorkbookChange(nextWorkbook, {source: 'filter', command});
     showToast(`Filtered ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`);
-  }, [activeCell, activeSheet.id, committedSelection, getDefaultCellValue, onCellChange, showToast]);
+  }, [activeCell, activeSheet.id, committedSelection, emitWorkbookChange, getDefaultCellValue, onCellChange, showToast]);
   const clearActiveFilter = useCallback(() => {
     if (!activeSheet.filters.size) {
       showToast('No active filter', 'error');
       return;
     }
-    const nextWorkbook = dispatchCommand(workbookRef.current, {type: CommandType.CLEAR_FILTER, id: 'selection-filter', label: 'Clear filter'});
+    const command = {type: CommandType.CLEAR_FILTER, id: 'selection-filter', label: 'Clear filter'};
+    const nextWorkbook = dispatchCommand(workbookRef.current, command);
     workbookRef.current = nextWorkbook;
     setWorkbook(nextWorkbook);
     setDimensionVersion((v) => v + 1);
     onCellChange?.({filter: null, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
+    emitWorkbookChange(nextWorkbook, {source: 'filter', command});
     showToast('Cleared filter');
-  }, [activeSheet.filters.size, onCellChange, showToast]);
+  }, [activeSheet.filters.size, emitWorkbookChange, onCellChange, showToast]);
   const resizeColumn = useCallback((col, size) => {
-    setWorkbook((currentWorkbook) => {
-      const nextWorkbook = dispatchCommand(currentWorkbook, {type: CommandType.RESIZE_COLUMN, col, size});
-      workbookRef.current = nextWorkbook;
-      return nextWorkbook;
-    });
+    const command = {type: CommandType.RESIZE_COLUMN, col, size};
+    const nextWorkbook = dispatchCommand(workbookRef.current, command);
+    workbookRef.current = nextWorkbook;
+    setWorkbook(nextWorkbook);
+    emitWorkbookChange(nextWorkbook, {source: 'resize', command});
     setDimensionVersion((v) => v + 1);
-  }, []);
+  }, [emitWorkbookChange]);
   const resizeRow = useCallback((row, size) => {
-    setWorkbook((currentWorkbook) => {
-      const nextWorkbook = dispatchCommand(currentWorkbook, {type: CommandType.RESIZE_ROW, row, size});
-      workbookRef.current = nextWorkbook;
-      return nextWorkbook;
-    });
+    const command = {type: CommandType.RESIZE_ROW, row, size};
+    const nextWorkbook = dispatchCommand(workbookRef.current, command);
+    workbookRef.current = nextWorkbook;
+    setWorkbook(nextWorkbook);
+    emitWorkbookChange(nextWorkbook, {source: 'resize', command});
     setDimensionVersion((v) => v + 1);
-  }, []);
+  }, [emitWorkbookChange]);
   const resetCellDimensions = useCallback((row, col) => {
-    const sheet = getActiveSheet(workbookRef.current);
-    if (!sheet.rowHeights.has(row) && !sheet.colWidths.has(col)) return;
-    setWorkbook((currentWorkbook) => {
-      const currentSheet = getActiveSheet(currentWorkbook);
-      const commands = [];
-      if (currentSheet.colWidths.has(col)) commands.push({type: CommandType.RESIZE_COLUMN, col, size: null});
-      if (currentSheet.rowHeights.has(row)) commands.push({type: CommandType.RESIZE_ROW, row, size: null});
-      const nextWorkbook = commands.length === 1
-        ? dispatchCommand(currentWorkbook, commands[0])
-        : dispatchCommand(currentWorkbook, {type: CommandType.BATCH, commands, label: 'Reset dimensions'});
-      workbookRef.current = nextWorkbook;
-      return nextWorkbook;
-    });
+    const currentWorkbook = workbookRef.current;
+    const currentSheet = getActiveSheet(currentWorkbook);
+    if (!currentSheet.rowHeights.has(row) && !currentSheet.colWidths.has(col)) return;
+    const commands = [];
+    if (currentSheet.colWidths.has(col)) commands.push({type: CommandType.RESIZE_COLUMN, col, size: null});
+    if (currentSheet.rowHeights.has(row)) commands.push({type: CommandType.RESIZE_ROW, row, size: null});
+    const command = commands.length === 1 ? commands[0] : {type: CommandType.BATCH, commands, label: 'Reset dimensions'};
+    const nextWorkbook = dispatchCommand(currentWorkbook, command);
+    workbookRef.current = nextWorkbook;
+    setWorkbook(nextWorkbook);
+    emitWorkbookChange(nextWorkbook, {source: 'resize', command});
     setDimensionVersion((v) => v + 1);
-  }, []);
+  }, [emitWorkbookChange]);
 
   useLayoutEffect(() => { calculateView(); drawSelectionOverlay(); }, [calculateView, drawSelectionOverlay, dimensionVersion, size.width, size.height]);
   useEffect(() => { if (editor && editorRef.current) { editorRef.current.focus(); editorRef.current.select(); } }, [editor]);
