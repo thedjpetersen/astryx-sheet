@@ -67,7 +67,9 @@ export const FORMULA_CATALOG = Object.freeze([
   {name: 'FILTER', category: 'Dynamic Array', picker: true},
   {name: 'UNIQUE', category: 'Dynamic Array', picker: true},
   {name: 'SORT', category: 'Dynamic Array', picker: true},
+  {name: 'SORTBY', category: 'Dynamic Array', picker: true},
   {name: 'SEQUENCE', category: 'Dynamic Array', picker: true},
+  {name: 'RANDARRAY', category: 'Dynamic Array', picker: true},
   {name: 'TRANSPOSE', category: 'Dynamic Array', picker: true},
   {name: 'HSTACK', category: 'Dynamic Array', picker: true},
   {name: 'VSTACK', category: 'Dynamic Array', picker: true},
@@ -75,6 +77,11 @@ export const FORMULA_CATALOG = Object.freeze([
   {name: 'DROP', category: 'Dynamic Array', picker: true},
   {name: 'CHOOSECOLS', category: 'Dynamic Array', picker: true},
   {name: 'CHOOSEROWS', category: 'Dynamic Array', picker: true},
+  {name: 'TOCOL', category: 'Dynamic Array', picker: true},
+  {name: 'TOROW', category: 'Dynamic Array', picker: true},
+  {name: 'WRAPROWS', category: 'Dynamic Array', picker: true},
+  {name: 'WRAPCOLS', category: 'Dynamic Array', picker: true},
+  {name: 'EXPAND', category: 'Dynamic Array', picker: true},
   {name: 'ROW', category: 'Reference', picker: true},
   {name: 'COLUMN', category: 'Reference', picker: true},
   {name: 'ROWS', category: 'Reference', picker: true},
@@ -195,11 +202,12 @@ export const FORMULA_CATALOG = Object.freeze([
   {name: 'TEXT', category: 'Text', picker: true},
   {name: 'TEXTBEFORE', category: 'Text', picker: true},
   {name: 'TEXTAFTER', category: 'Text', picker: true},
+  {name: 'TEXTSPLIT', category: 'Text', picker: true},
   {name: 'TEXTJOIN', category: 'Text', picker: true},
   {name: 'CONCAT', category: 'Text', picker: true},
 ]);
 
-export const VOLATILE_FORMULA_FUNCTIONS = Object.freeze(['TODAY', 'NOW', 'RAND', 'RANDBETWEEN', 'INDIRECT', 'OFFSET']);
+export const VOLATILE_FORMULA_FUNCTIONS = Object.freeze(['TODAY', 'NOW', 'RAND', 'RANDBETWEEN', 'RANDARRAY', 'INDIRECT', 'OFFSET']);
 const VOLATILE_FORMULA_PATTERN = new RegExp(`\\b(?:${VOLATILE_FORMULA_FUNCTIONS.join('|')})\\s*\\(`, 'i');
 const FORMULA_FUNCTION_NAME_SET = new Set(FORMULA_CATALOG.map((item) => item.name));
 const FORMULA_REFERENCE_COLORS = Object.freeze(['blue', 'green', 'purple', 'orange', 'teal', 'pink']);
@@ -276,7 +284,9 @@ const FORMULA_HELP = Object.freeze({
   FILTER: {signature: 'FILTER(array, include, [if_empty])', description: 'Returns rows or columns from an array that match a Boolean include vector.'},
   UNIQUE: {signature: 'UNIQUE(array, [by_col], [exactly_once])', description: 'Returns unique rows or columns from an array.'},
   SORT: {signature: 'SORT(array, [sort_index], [sort_order], [by_col])', description: 'Sorts rows or columns in an array by a selected index.'},
+  SORTBY: {signature: 'SORTBY(array, by_array1, [sort_order1], [by_array2], [sort_order2], ...)', description: 'Sorts an array by one or more paired sort arrays.'},
   SEQUENCE: {signature: 'SEQUENCE(rows, [columns], [start], [step])', description: 'Generates a rectangular numeric sequence.'},
+  RANDARRAY: {signature: 'RANDARRAY([rows], [columns], [min], [max], [integer])', description: 'Returns an array of random numbers.'},
   TRANSPOSE: {signature: 'TRANSPOSE(array)', description: 'Flips rows and columns in an array.'},
   HSTACK: {signature: 'HSTACK(array1, [array2], ...)', description: 'Appends arrays horizontally into one wider dynamic array.'},
   VSTACK: {signature: 'VSTACK(array1, [array2], ...)', description: 'Appends arrays vertically into one taller dynamic array.'},
@@ -284,6 +294,11 @@ const FORMULA_HELP = Object.freeze({
   DROP: {signature: 'DROP(array, rows, [columns])', description: 'Excludes rows or columns from the start or end of an array.'},
   CHOOSECOLS: {signature: 'CHOOSECOLS(array, col_num1, [col_num2], ...)', description: 'Returns selected columns from an array in the requested order.'},
   CHOOSEROWS: {signature: 'CHOOSEROWS(array, row_num1, [row_num2], ...)', description: 'Returns selected rows from an array in the requested order.'},
+  TOCOL: {signature: 'TOCOL(array, [ignore], [scan_by_column])', description: 'Flattens an array into a single column.'},
+  TOROW: {signature: 'TOROW(array, [ignore], [scan_by_column])', description: 'Flattens an array into a single row.'},
+  WRAPROWS: {signature: 'WRAPROWS(vector, wrap_count, [pad_with])', description: 'Wraps a row or column vector into rows after a fixed number of values.'},
+  WRAPCOLS: {signature: 'WRAPCOLS(vector, wrap_count, [pad_with])', description: 'Wraps a row or column vector into columns after a fixed number of values.'},
+  EXPAND: {signature: 'EXPAND(array, rows, [columns], [pad_with])', description: 'Expands an array to a larger shape, padding new cells.'},
   ROW: {signature: 'ROW([reference])', description: 'Returns the row number for a reference or the current cell.'},
   COLUMN: {signature: 'COLUMN([reference])', description: 'Returns the column number for a reference or the current cell.'},
   ROWS: {signature: 'ROWS(range)', description: 'Returns the number of rows in a reference.'},
@@ -336,6 +351,7 @@ const FORMULA_HELP = Object.freeze({
   CONCAT: {signature: 'CONCAT(value1, [value2], ...)', description: 'Combines text values without a delimiter.'},
   TEXTBEFORE: {signature: 'TEXTBEFORE(text, delimiter, [instance], [match_mode], [match_end], [if_not_found])', description: 'Returns text before a delimiter.'},
   TEXTAFTER: {signature: 'TEXTAFTER(text, delimiter, [instance], [match_mode], [match_end], [if_not_found])', description: 'Returns text after a delimiter.'},
+  TEXTSPLIT: {signature: 'TEXTSPLIT(text, col_delimiter, [row_delimiter], [ignore_empty], [match_mode], [pad_with])', description: 'Splits text into a dynamic array across columns and rows.'},
   NUMBERVALUE: {signature: 'NUMBERVALUE(text, [decimal_separator], [group_separator])', description: 'Converts localized numeric text to a number.'},
   PMT: {signature: 'PMT(rate, number_of_periods, present_value, [future_value], [type])', description: 'Returns the payment for a loan or annuity.'},
   PV: {signature: 'PV(rate, number_of_periods, payment, [future_value], [type])', description: 'Returns the present value of an investment or annuity.'},
@@ -361,9 +377,11 @@ const FORMULA_ARGUMENT_HELP = Object.freeze({
   array: {description: 'A range, spilled array, or expression that returns a rectangular set of values.'},
   average_range: {description: 'The cells to average after every criteria range and criterion pair matches.'},
   basis: {description: 'The day-count basis used for year fraction calculations.'},
+  by_array: {description: 'A row or column vector used as a sort key for the array.'},
   bottom: {description: 'The lowest integer that RANDBETWEEN can return.'},
   calculation_or_name: {description: 'Either the final calculation to return, or the next local name in a LET name/value pair.'},
   col_num: {description: 'A one-based column position to return. Negative values count back from the end.'},
+  col_delimiter: {description: 'The text that marks where to split into separate columns.'},
   column: {description: 'The one-based column number or reference column to use.'},
   columns: {description: 'The number of columns to return. This value must be at least 1 when supplied.'},
   condition: {description: 'A logical test that resolves to TRUE or FALSE.'},
@@ -390,9 +408,11 @@ const FORMULA_ARGUMENT_HELP = Object.freeze({
   if_empty: {description: 'The value to return when FILTER finds no matching rows or columns.'},
   if_not_found: {description: 'The fallback value to return when the delimiter is not found.'},
   ignore_empty: {description: 'TRUE skips blank text arguments; FALSE keeps them.'},
+  ignore: {description: 'Use 0 to keep all values, 1 to ignore blanks, 2 to ignore errors, or 3 to ignore both.'},
   include: {description: 'A Boolean row or column vector that decides which values from the array are returned.'},
   index: {description: 'A one-based position that selects which value, row, or column to return.'},
   instance: {description: 'Which delimiter occurrence to use. Negative values count from the end.'},
+  integer: {description: 'TRUE returns whole numbers; FALSE returns decimal numbers.'},
   is_sorted: {description: 'FALSE requires an exact lookup; TRUE allows approximate lookup in sorted data.'},
   k: {description: 'The one-based rank to return from the data set.'},
   lookup_range: {description: 'The one-dimensional row or column to search. It must align with the result range.'},
@@ -400,8 +420,10 @@ const FORMULA_ARGUMENT_HELP = Object.freeze({
   match_mode: {description: 'Controls exact, approximate, or wildcard matching.'},
   match_type: {description: 'Controls exact or approximate matching for MATCH.'},
   max_range: {description: 'The cells to search for the maximum value after criteria match.'},
+  max: {description: 'The largest generated value.'},
   method: {description: 'FALSE uses the US 30/360 method; TRUE uses the European 30/360 method.'},
   min_range: {description: 'The cells to search for the minimum value after criteria match.'},
+  min: {description: 'The smallest generated value.'},
   minute: {description: 'The minute value to use when building a time.'},
   missing: {description: 'The fallback value to return when no lookup match is found.'},
   month: {description: 'The month number to use when building a date.'},
@@ -411,6 +433,7 @@ const FORMULA_ARGUMENT_HELP = Object.freeze({
   num_chars: {description: 'The number of characters to return. This value must be zero or greater.'},
   order: {description: 'Use 0 for descending rank or 1 for ascending rank.'},
   payment: {description: 'The payment made each period.'},
+  pad_with: {description: 'The value used to fill generated cells when the output shape is larger than the source values.'},
   period: {description: 'The one-based period for the payment calculation.'},
   places: {description: 'The number of digits to keep. Negative values round to the left of the decimal point.'},
   present_value: {description: 'The current value of the loan, investment, or annuity.'},
@@ -421,10 +444,12 @@ const FORMULA_ARGUMENT_HELP = Object.freeze({
   reference: {description: 'A cell or range reference.'},
   result_range: {description: 'The row, column, or range that returns values for the matching lookup position.'},
   row: {description: 'The one-based row number or reference row to use.'},
+  row_delimiter: {description: 'The text that marks where to split into separate rows.'},
   row_num: {description: 'A one-based row position to return. Negative values count back from the end.'},
   rows: {description: 'The number of rows to return. This value must be at least 1 when supplied.'},
   search_key: {description: 'The value to find in the lookup range.'},
   search_mode: {description: 'Controls forward, reverse, or binary search order.'},
+  scan_by_column: {description: 'TRUE reads down columns before moving right; FALSE reads across rows first.'},
   second: {description: 'The second value to use when building a time.'},
   start: {description: 'The first value in the generated sequence.'},
   start_date: {description: 'The beginning date for the date calculation.'},
@@ -441,7 +466,9 @@ const FORMULA_ARGUMENT_HELP = Object.freeze({
   value_if_false: {description: 'The value to return when the condition is FALSE.'},
   value_if_na: {description: 'The fallback value to return when the first argument is #N/A.'},
   value_if_true: {description: 'The value to return when the condition is TRUE.'},
+  vector: {description: 'A single row or single column of values.'},
   width: {description: 'The number of columns in the returned reference.'},
+  wrap_count: {description: 'The number of values to place in each wrapped row or column. This value must be at least 1.'},
   within_text: {description: 'The text to search within.'},
   x: {description: 'The x value to evaluate against the known trend.'},
   year: {description: 'The year number to use when building a date.'},
@@ -466,6 +493,11 @@ const FORMULA_FUNCTION_ARGUMENT_HELP = Object.freeze({
     rows: {description: 'Positive values remove rows from the top; negative values remove rows from the bottom; zero leaves rows unchanged.'},
     columns: {description: 'Positive values remove columns from the left; negative values remove columns from the right; zero leaves columns unchanged.'},
   },
+  EXPAND: {
+    rows: {description: 'The desired output height. It must be at least the source array height.'},
+    columns: {description: 'The desired output width. It must be at least the source array width.'},
+    pad_with: {description: 'Optional value for generated cells. Omit it to pad with #N/A.'},
+  },
   INDEX: {
     row: {description: 'The one-based row inside the reference. Use 0 to return an entire column when supported.'},
     column: {description: 'The one-based column inside the reference. Use 0 to return an entire row when supported.'},
@@ -485,14 +517,31 @@ const FORMULA_FUNCTION_ARGUMENT_HELP = Object.freeze({
       options: ['1 Saturday/Sunday', '11 Sunday only', '17 Saturday only', '"0000011" pattern'],
     },
   },
+  RANDARRAY: {
+    rows: {description: 'The number of random rows to generate. Omit for a single row.'},
+    columns: {description: 'The number of random columns to generate. Omit for a single column.'},
+    integer: {description: 'TRUE returns integers between min and max; FALSE returns decimal values.'},
+  },
   SORT: {
     sort_index: {description: 'The one-based row or column inside the array to sort by.'},
     sort_order: {description: 'Use 1 for ascending order or -1 for descending order.', options: ['1 ascending', '-1 descending']},
     by_col: {description: 'FALSE sorts rows by a column; TRUE sorts columns by a row.'},
   },
+  SORTBY: {
+    by_array: {description: 'A row or column vector aligned with the rows or columns being sorted.'},
+    sort_order: {description: 'Use 1 for ascending order or -1 for descending order.', options: ['1 ascending', '-1 descending']},
+  },
   TAKE: {
     rows: {description: 'Positive values return rows from the top; negative values return rows from the bottom.'},
     columns: {description: 'Positive values return columns from the left; negative values return columns from the right.'},
+  },
+  TOCOL: {
+    ignore: {description: 'Use 0 to keep all values, 1 to ignore blanks, 2 to ignore errors, or 3 to ignore blanks and errors.', options: ['0 keep all', '1 ignore blanks', '2 ignore errors', '3 ignore blanks and errors']},
+    scan_by_column: {description: 'FALSE scans each row left-to-right; TRUE scans each column top-to-bottom.'},
+  },
+  TOROW: {
+    ignore: {description: 'Use 0 to keep all values, 1 to ignore blanks, 2 to ignore errors, or 3 to ignore blanks and errors.', options: ['0 keep all', '1 ignore blanks', '2 ignore errors', '3 ignore blanks and errors']},
+    scan_by_column: {description: 'FALSE scans each row left-to-right; TRUE scans each column top-to-bottom.'},
   },
   TEXTAFTER: {
     match_mode: {description: 'Use 0 for case-sensitive delimiter matching or 1 for case-insensitive matching.', options: ['0 case-sensitive', '1 case-insensitive']},
@@ -501,6 +550,11 @@ const FORMULA_FUNCTION_ARGUMENT_HELP = Object.freeze({
   TEXTBEFORE: {
     match_mode: {description: 'Use 0 for case-sensitive delimiter matching or 1 for case-insensitive matching.', options: ['0 case-sensitive', '1 case-insensitive']},
     match_end: {description: 'Use 1 to allow the end of text to match when the delimiter is not found.', options: ['0 exact delimiter only', '1 match end of text']},
+  },
+  TEXTSPLIT: {
+    ignore_empty: {description: 'TRUE suppresses empty results from repeated delimiters; FALSE keeps them.'},
+    match_mode: {description: 'Use 0 for case-sensitive delimiter matching or 1 for case-insensitive matching.', options: ['0 case-sensitive', '1 case-insensitive']},
+    pad_with: {description: 'The value used to fill shorter rows. Omit it to pad with #N/A.'},
   },
   UNIQUE: {
     by_col: {description: 'FALSE compares rows; TRUE compares columns.'},
@@ -935,6 +989,20 @@ function formulaRangeCompatibilityDiagnostics(formula, context = {}) {
       if (firstShape && mismatched) {
         addShapeDiagnostic(`SUMPRODUCT arrays must have the same shape; found ${formulaRangeShapeText(firstShape)} and ${formulaRangeShapeText(formulaRangeShape(mismatched))}.`);
       }
+      continue;
+    }
+    if (call.name === 'SORTBY') {
+      const arrayShape = formulaRangeShape(formulaRangeReferenceForDiagnostics(call.args[0], context));
+      if (!arrayShape) continue;
+      for (let index = 1; index < call.args.length; index += 2) {
+        const byShape = formulaRangeShape(formulaRangeReferenceForDiagnostics(call.args[index], context));
+        if (!byShape) continue;
+        const rowCompatible = byShape.rows === arrayShape.rows && byShape.cols === 1;
+        const colCompatible = byShape.rows === 1 && byShape.cols === arrayShape.cols;
+        if (!rowCompatible && !colCompatible) {
+          addShapeDiagnostic(`SORTBY by_array ranges must be one row or one column aligned with the array; found ${formulaRangeShapeText(arrayShape)} and ${formulaRangeShapeText(byShape)}.`);
+        }
+      }
     }
   }
   return diagnostics;
@@ -1058,6 +1126,20 @@ function formulaOptionValueDiagnostics(formula) {
           end: call.end,
         });
       }
+      continue;
+    }
+    if (call.name === 'SORTBY') {
+      for (let index = 2; index < call.args.length; index += 2) {
+        addModeDiagnostic(call, index, 'sort_order', [1, -1]);
+      }
+      continue;
+    }
+    if (call.name === 'TOCOL' || call.name === 'TOROW') {
+      addModeDiagnostic(call, 1, 'ignore', [0, 1, 2, 3]);
+      continue;
+    }
+    if (call.name === 'TEXTSPLIT') {
+      addModeDiagnostic(call, 4, 'match_mode', [0, 1]);
     }
   }
   return diagnostics;
@@ -1189,11 +1271,39 @@ function formulaArgumentDomainDiagnostics(formula, context = {}) {
       addMinimumDiagnostic(call, 1, 'columns', 1);
       continue;
     }
+    if (call.name === 'RANDARRAY') {
+      addMinimumDiagnostic(call, 0, 'rows', 1);
+      addMinimumDiagnostic(call, 1, 'columns', 1);
+      const minValue = formulaStaticNumberArgument(call.args[2] ?? 0);
+      const maxValue = formulaStaticNumberArgument(call.args[3] ?? 1);
+      if (minValue != null && maxValue != null && minValue > maxValue) {
+        addDomainDiagnostic(call, 'max', call.args[3] ?? '1', `must be greater than or equal to ${call.args[2] ?? '0'}`);
+      }
+      continue;
+    }
     if (call.name === 'TAKE') {
       const rows = formulaStaticNumberArgument(call.args[1]);
       const columns = formulaStaticNumberArgument(call.args[2]);
       if (rows != null && Math.trunc(rows) === 0) addDomainDiagnostic(call, 'rows', call.args[1], 'cannot be zero');
       if (columns != null && Math.trunc(columns) === 0) addDomainDiagnostic(call, 'columns', call.args[2], 'cannot be zero');
+      continue;
+    }
+    if (call.name === 'WRAPROWS' || call.name === 'WRAPCOLS') {
+      addMinimumDiagnostic(call, 1, 'wrap_count', 1);
+      continue;
+    }
+    if (call.name === 'EXPAND') {
+      addMinimumDiagnostic(call, 1, 'rows', 1);
+      addMinimumDiagnostic(call, 2, 'columns', 1);
+      const shape = formulaRangeShape(formulaRangeReferenceForDiagnostics(call.args[0], context));
+      const rowCount = formulaStaticNumberArgument(call.args[1]);
+      const colCount = formulaStaticNumberArgument(call.args[2]);
+      if (shape && rowCount != null && Math.trunc(rowCount) < shape.rows) {
+        addDomainDiagnostic(call, 'rows', call.args[1], `must be at least the source height ${shape.rows}`);
+      }
+      if (shape && colCount != null && Math.trunc(colCount) < shape.cols) {
+        addDomainDiagnostic(call, 'columns', call.args[2], `must be at least the source width ${shape.cols}`);
+      }
       continue;
     }
     if (call.name === 'LARGE' || call.name === 'SMALL') {
@@ -2305,7 +2415,9 @@ export function createFormulaTemplate(name, context = {}) {
     FILTER: `=FILTER(${firstColumnRange},${firstColumnRange}>0)`,
     UNIQUE: `=UNIQUE(${firstColumnRange})`,
     SORT: `=SORT(${range},1,1)`,
+    SORTBY: `=SORTBY(${range},${firstColumnRange},1)`,
     SEQUENCE: `=SEQUENCE(${Math.max(1, rowCount)},${Math.max(1, lastColumnIndex)})`,
+    RANDARRAY: `=RANDARRAY(${Math.max(1, rowCount)},${Math.max(1, lastColumnIndex)})`,
     TRANSPOSE: `=TRANSPOSE(${range})`,
     HSTACK: `=HSTACK(${firstColumnRange},${lastColumnRange})`,
     VSTACK: `=VSTACK(${firstColumnRange},${lastColumnRange})`,
@@ -2313,6 +2425,11 @@ export function createFormulaTemplate(name, context = {}) {
     DROP: `=DROP(${range},1)`,
     CHOOSECOLS: `=CHOOSECOLS(${range},1,${Math.max(1, lastColumnIndex)})`,
     CHOOSEROWS: `=CHOOSEROWS(${range},1,${Math.max(1, rowCount)})`,
+    TOCOL: `=TOCOL(${range})`,
+    TOROW: `=TOROW(${range})`,
+    WRAPROWS: `=WRAPROWS(${firstColumnRange},2)`,
+    WRAPCOLS: `=WRAPCOLS(${firstColumnRange},2)`,
+    EXPAND: `=EXPAND(${range},${Math.max(1, rowCount) + 1},${Math.max(1, lastColumnIndex) + 1},"")`,
     ROW: `=ROW(${firstCell})`,
     COLUMN: `=COLUMN(${firstCell})`,
     ROWS: `=ROWS(${range})`,
@@ -2417,6 +2534,7 @@ export function createFormulaTemplate(name, context = {}) {
     CLEAN: `=CLEAN(${firstCell})`,
     TEXTBEFORE: '=TEXTBEFORE("ada lovelace"," ")',
     TEXTAFTER: '=TEXTAFTER("ada lovelace"," ")',
+    TEXTSPLIT: '=TEXTSPLIT("north,south|east,west",",","|")',
     TEXTJOIN: `=TEXTJOIN(", ",TRUE,${range})`,
     CONCAT: `=CONCAT(${firstCell},${lastCell})`,
     SUMPRODUCT: `=SUMPRODUCT(${range},${range})`,
@@ -2938,6 +3056,41 @@ function textBeforeAfter(text, delimiter, instance, matchMode = 0, matchEnd = fa
     return ifNotFound == null ? '#N/A' : ifNotFound;
   }
   return after ? source.slice(position + target.length) : source.slice(0, position);
+}
+
+function splitTextByDelimiter(text, delimiter, matchMode = 0) {
+  const source = String(text ?? '');
+  const target = String(delimiter ?? '');
+  if (!target) return [source];
+  const haystack = matchMode === 1 ? source.toLowerCase() : source;
+  const needle = matchMode === 1 ? target.toLowerCase() : target;
+  const parts = [];
+  let position = 0;
+  while (position <= source.length) {
+    const nextIndex = haystack.indexOf(needle, position);
+    if (nextIndex < 0) break;
+    parts.push(source.slice(position, nextIndex));
+    position = nextIndex + target.length;
+  }
+  parts.push(source.slice(position));
+  return parts;
+}
+
+function textSplitMatrix(text, colDelimiter, rowDelimiter = '', ignoreEmpty = false, matchMode = 0, padWith = '#N/A') {
+  const source = String(text ?? '');
+  const columnTarget = String(colDelimiter ?? '');
+  const rowTarget = String(rowDelimiter ?? '');
+  const normalizedMatchMode = Math.trunc(matchMode);
+  if (!columnTarget && !rowTarget) return '#VALUE!';
+  if (![0, 1].includes(normalizedMatchMode)) return '#VALUE!';
+  const sourceRows = rowTarget ? splitTextByDelimiter(source, rowTarget, normalizedMatchMode) : [source];
+  const rows = sourceRows.map((rowText) => {
+    const values = columnTarget ? splitTextByDelimiter(rowText, columnTarget, normalizedMatchMode) : [rowText];
+    return ignoreEmpty ? values.filter((value) => value !== '') : values;
+  });
+  const colCount = Math.max(0, ...rows.map((row) => row.length));
+  if (!rows.length || colCount === 0) return '#CALC!';
+  return rows.map((row) => Array.from({length: colCount}, (_item, index) => row[index] ?? padWith));
 }
 
 function findLookupIndex(values, lookupValue, matchMode = 0, searchMode = 1) {
@@ -4399,6 +4552,41 @@ export function evaluateFormula(raw, dataRef, origin, getDefaultCellValue = defa
       const offset = index > 0 ? index - 1 : maxIndex + index;
       return offset >= 0 && offset < maxIndex ? offset : null;
     };
+    const matrixValuesByScan = (matrix, scanByColumn = false) => {
+      const size = matrixDimensions(matrix);
+      const values = [];
+      if (scanByColumn) {
+        for (let colIndex = 0; colIndex < size.cols; colIndex++) {
+          for (let rowIndex = 0; rowIndex < size.rows; rowIndex++) {
+            values.push(matrix[rowIndex]?.[colIndex] ?? '');
+          }
+        }
+        return values;
+      }
+      for (let rowIndex = 0; rowIndex < size.rows; rowIndex++) {
+        for (let colIndex = 0; colIndex < size.cols; colIndex++) {
+          values.push(matrix[rowIndex]?.[colIndex] ?? '');
+        }
+      }
+      return values;
+    };
+    const vectorValuesForMatrix = (matrix) => {
+      const size = matrixDimensions(matrix);
+      if (size.rows !== 1 && size.cols !== 1) return null;
+      return size.rows === 1
+        ? Array.from({length: size.cols}, (_item, colIndex) => matrix[0]?.[colIndex] ?? '')
+        : Array.from({length: size.rows}, (_item, rowIndex) => matrix[rowIndex]?.[0] ?? '');
+    };
+    const sortVectorForMatrix = (matrix, arraySize) => {
+      const size = matrixDimensions(matrix);
+      if (size.rows === arraySize.rows && size.cols === 1) {
+        return {orientation: 'rows', values: Array.from({length: size.rows}, (_item, rowIndex) => matrix[rowIndex]?.[0] ?? '')};
+      }
+      if (size.rows === 1 && size.cols === arraySize.cols) {
+        return {orientation: 'cols', values: Array.from({length: size.cols}, (_item, colIndex) => matrix[0]?.[colIndex] ?? '')};
+      }
+      return '#VALUE!';
+    };
     const booleanMatrixForArg = (arg) => {
       const comparison = findComparison(arg);
       if (!comparison) {
@@ -4755,6 +4943,30 @@ export function evaluateFormula(raw, dataRef, origin, getDefaultCellValue = defa
         Array.from({length: colCount}, (_col, colIndex) => start + step * (rowIndex * colCount + colIndex))
       )));
     }
+    if (name === 'RANDARRAY') {
+      const rawRowCount = resolveNumber(args[0] ?? 1);
+      const rawColCount = resolveNumber(args[1] ?? 1);
+      const min = resolveNumber(args[2] ?? 0);
+      const max = resolveNumber(args[3] ?? 1);
+      const integerValue = args[4] == null ? false : resolveScalar(args[4]);
+      const error = firstErrorValue([rawRowCount, rawColCount, min, max, integerValue]);
+      if (error) return error;
+      const rowCount = Math.trunc(rawRowCount);
+      const colCount = Math.trunc(rawColCount);
+      if (rowCount < 1 || colCount < 1 || max < min) return '#VALUE!';
+      const integer = !isFalseLike(integerValue);
+      const values = [];
+      for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+        const row = [];
+        for (let colIndex = 0; colIndex < colCount; colIndex++) {
+          const random = randomValue(options.random);
+          if (isErrorValue(random)) return random;
+          row.push(integer ? Math.floor(min + random * (max - min + 1)) : min + random * (max - min));
+        }
+        values.push(row);
+      }
+      return formulaArrayValue(values);
+    }
     if (name === 'TRANSPOSE') {
       const matrix = matrixForRangeArg(args[0]);
       if (isErrorValue(matrix)) return matrix;
@@ -4834,6 +5046,65 @@ export function evaluateFormula(raw, dataRef, origin, getDefaultCellValue = defa
         ? matrix.map((row) => selectedOffsets.map((colIndex) => row[colIndex] ?? ''))
         : selectedOffsets.map((rowIndex) => paddedMatrixRow(matrix[rowIndex], size.cols, '')));
     }
+    if (name === 'TOCOL' || name === 'TOROW') {
+      const matrix = nonEmptyMatrixForArg(args[0]);
+      if (isErrorValue(matrix)) return matrix;
+      const rawIgnore = resolveNumber(args[1] ?? 0);
+      const scanByColumnValue = args[2] == null ? false : resolveScalar(args[2]);
+      const error = firstErrorValue([rawIgnore, scanByColumnValue]);
+      if (error) return error;
+      const ignore = Math.trunc(rawIgnore);
+      if (![0, 1, 2, 3].includes(ignore)) return '#VALUE!';
+      const ignoreBlanks = ignore === 1 || ignore === 3;
+      const ignoreErrors = ignore === 2 || ignore === 3;
+      const values = matrixValuesByScan(matrix, !isFalseLike(scanByColumnValue)).filter((value) => (
+        !(ignoreBlanks && value === '') && !(ignoreErrors && isErrorValue(value))
+      ));
+      if (!values.length) return '#CALC!';
+      return formulaArrayValue(name === 'TOCOL' ? values.map((value) => [value]) : [values]);
+    }
+    if (name === 'WRAPROWS' || name === 'WRAPCOLS') {
+      if (args.length < 2) return '#VALUE!';
+      const matrix = nonEmptyMatrixForArg(args[0]);
+      if (isErrorValue(matrix)) return matrix;
+      const vector = vectorValuesForMatrix(matrix);
+      if (!vector) return '#VALUE!';
+      const rawWrapCount = resolveNumber(args[1]);
+      const padValue = args[2] == null ? '#N/A' : resolveScalar(args[2]);
+      const error = firstErrorValue([rawWrapCount]);
+      if (error) return error;
+      const wrapCount = Math.trunc(rawWrapCount);
+      if (!Number.isFinite(wrapCount) || wrapCount < 1) return '#VALUE!';
+      if (name === 'WRAPROWS') {
+        const rowCount = Math.ceil(vector.length / wrapCount);
+        return formulaArrayValue(Array.from({length: rowCount}, (_row, rowIndex) => (
+          Array.from({length: wrapCount}, (_col, colIndex) => vector[rowIndex * wrapCount + colIndex] ?? padValue)
+        )));
+      }
+      const colCount = Math.ceil(vector.length / wrapCount);
+      return formulaArrayValue(Array.from({length: wrapCount}, (_row, rowIndex) => (
+        Array.from({length: colCount}, (_col, colIndex) => vector[colIndex * wrapCount + rowIndex] ?? padValue)
+      )));
+    }
+    if (name === 'EXPAND') {
+      if (args.length < 2) return '#VALUE!';
+      const matrix = nonEmptyMatrixForArg(args[0]);
+      if (isErrorValue(matrix)) return matrix;
+      const size = matrixDimensions(matrix);
+      const rawRows = resolveNumber(args[1]);
+      const rawCols = args[2] == null ? size.cols : resolveNumber(args[2]);
+      const padValue = args[3] == null ? '#N/A' : resolveScalar(args[3]);
+      const error = firstErrorValue([rawRows, rawCols]);
+      if (error) return error;
+      const rowCount = Math.trunc(rawRows);
+      const colCount = Math.trunc(rawCols);
+      if (!Number.isFinite(rowCount) || !Number.isFinite(colCount) || rowCount < size.rows || colCount < size.cols) return '#VALUE!';
+      return formulaArrayValue(Array.from({length: rowCount}, (_row, rowIndex) => (
+        Array.from({length: colCount}, (_col, colIndex) => (
+          rowIndex < size.rows && colIndex < size.cols ? matrix[rowIndex]?.[colIndex] ?? '' : padValue
+        ))
+      )));
+    }
     if (name === 'FILTER') {
       const matrix = matrixForRangeArg(args[0]);
       if (isErrorValue(matrix)) return matrix;
@@ -4908,6 +5179,40 @@ export function evaluateFormula(raw, dataRef, origin, getDefaultCellValue = defa
       }
       if (matrix.some((row) => sortIndex > row.length)) return '#VALUE!';
       return formulaArrayValue([...matrix].sort((a, b) => sortOrder * compareValues(a[sortIndex - 1], b[sortIndex - 1])));
+    }
+    if (name === 'SORTBY') {
+      if (args.length < 2) return '#VALUE!';
+      const matrix = nonEmptyMatrixForArg(args[0]);
+      if (isErrorValue(matrix)) return matrix;
+      const size = matrixDimensions(matrix);
+      const descriptors = [];
+      let orientation = null;
+      for (let index = 1; index < args.length; index += 2) {
+        const byMatrix = nonEmptyMatrixForArg(args[index]);
+        if (isErrorValue(byMatrix)) return byMatrix;
+        const vector = sortVectorForMatrix(byMatrix, size);
+        if (isErrorValue(vector)) return vector;
+        const sortOrderValue = resolveNumber(args[index + 1] ?? 1);
+        if (isErrorValue(sortOrderValue)) return sortOrderValue;
+        const sortOrder = Math.trunc(sortOrderValue);
+        if (![1, -1].includes(sortOrder)) return '#VALUE!';
+        if (orientation && orientation !== vector.orientation) return '#VALUE!';
+        orientation = vector.orientation;
+        descriptors.push({values: vector.values, sortOrder});
+      }
+      if (!descriptors.length || !orientation) return '#VALUE!';
+      const length = orientation === 'rows' ? size.rows : size.cols;
+      const indexes = Array.from({length}, (_item, index) => index);
+      indexes.sort((leftIndex, rightIndex) => {
+        for (const descriptor of descriptors) {
+          const comparison = compareValues(descriptor.values[leftIndex], descriptor.values[rightIndex]);
+          if (comparison !== 0) return descriptor.sortOrder * comparison;
+        }
+        return leftIndex - rightIndex;
+      });
+      return formulaArrayValue(orientation === 'rows'
+        ? indexes.map((index) => matrix[index])
+        : matrix.map((row) => indexes.map((index) => row[index] ?? '')));
     }
     if (name === 'ROW' || name === 'COLUMN') {
       const range = rangeForReferenceArg(args[0], true);
@@ -5285,6 +5590,18 @@ export function evaluateFormula(raw, dataRef, origin, getDefaultCellValue = defa
       if (error) return error;
       if (![0, 1].includes(Math.trunc(matchMode))) return '#VALUE!';
       return textBeforeAfter(text, delimiter, instance, Math.trunc(matchMode), !isFalseLike(matchEndValue), ifNotFound, name === 'TEXTAFTER');
+    }
+    if (name === 'TEXTSPLIT') {
+      const text = resolveScalar(args[0]);
+      const colDelimiter = resolveScalar(args[1]);
+      const rowDelimiter = args[2] == null ? '' : resolveScalar(args[2]);
+      const ignoreEmptyValue = args[3] == null ? false : resolveScalar(args[3]);
+      const matchMode = args[4] == null ? 0 : resolveNumber(args[4]);
+      const padValue = args[5] == null ? '#N/A' : resolveScalar(args[5]);
+      const error = firstErrorValue([text, colDelimiter, rowDelimiter, ignoreEmptyValue, matchMode]);
+      if (error) return error;
+      const matrix = textSplitMatrix(text, colDelimiter, rowDelimiter, !isFalseLike(ignoreEmptyValue), matchMode, padValue);
+      return isErrorValue(matrix) ? matrix : formulaArrayValue(matrix);
     }
     if (name === 'LET') {
       if (args.length < 3 || args.length % 2 === 0) return '#VALUE!';

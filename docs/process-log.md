@@ -138,6 +138,10 @@
 - Added engine-backed dynamic-array spill reads through `createSheetDataRef`, `getCellDisplayValue`, and cached display helpers, including React grid spill-cell rendering and `#SPILL!` display for blocked spill ranges.
 - Added dependency-graph edges for dynamic-array spill footprints so formulas that read spilled cells recalculate when the spill origin changes, and blocked spill origins recalculate when blocking cells are cleared.
 - Added Excel-style spilled-range references such as `A1#` to the evaluator, formula dependency graph, and formula editor tokenizer, including `#SPILL!` propagation when the referenced spill origin is blocked.
+- Added Excel dynamic-array reshape helpers `TOCOL`, `TOROW`, `WRAPROWS`, `WRAPCOLS`, and `EXPAND`, with spill evaluation, picker templates, argument help, diagnostics, and nested array consumption through the headless engine path.
+- Added Excel-compatible `TEXTSPLIT` as a spillable text formula, including row/column delimiters, empty-value suppression, case-insensitive matching, padding, picker metadata, and nested numeric consumption.
+- Added dynamic-array `SORTBY` and volatile `RANDARRAY` evaluation, including multi-key sort vectors, deterministic random testing hooks, picker templates, diagnostics, and spill-aware recalculation coverage.
+- Added Vite-backed UI component wiring tests for toolbar commands, formula-editor prop forwarding, view controls, context-menu actions, sheet tabs, function picker rendering, and cell state rendering.
 
 ## Current Direction
 
