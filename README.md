@@ -41,8 +41,10 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - React toolbar filtering that collapses hidden rows through the virtualized row metrics
 - Merged range metadata with overlap validation, undo/redo, selectors, and snapshot serialization
 - React grid rendering for host-provided merged ranges, including row and column spans in the virtual window
+- React toolbar actions for creating and clearing workbook merged ranges
 - Data validation rules with list, number, and text predicates plus undo/redo and snapshot serialization
 - React edit, clear, and paste flows enforce host-provided validation rules and mark invalid visible cells
+- React toolbar actions for adding number/list validation rules and clearing active validation rules
 - Inspector metrics for merged ranges, validation rules, and named ranges
 - Formula evaluation for `SUM`, `AVERAGE` / `AVG`, `MIN`, `MAX`, `COUNT`, `CONCAT`, cell references, ranges, and basic arithmetic
 - Right-click context menu for edit, clear, copy, resize, and sample formula actions

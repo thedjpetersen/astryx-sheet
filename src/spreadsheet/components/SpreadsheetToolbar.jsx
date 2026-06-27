@@ -39,6 +39,11 @@ export function SpreadsheetToolbar({
   onSortDescending,
   onFilterSelection,
   onClearFilter,
+  onMergeSelection,
+  onUnmergeSelection,
+  onValidateNumber,
+  onValidateList,
+  onClearValidation,
   onWidenActiveColumn,
   onTallerActiveRow,
   themeName,
@@ -99,6 +104,11 @@ export function SpreadsheetToolbar({
         <Button label="Sort Z-A" variant="secondary" size="sm" onClick={onSortDescending} />
         <Button label="Filter" variant="secondary" size="sm" onClick={onFilterSelection} />
         <Button label="Clear filter" variant="secondary" size="sm" onClick={onClearFilter} />
+        <Button label="Merge" variant="secondary" size="sm" onClick={onMergeSelection} />
+        <Button label="Unmerge" variant="secondary" size="sm" onClick={onUnmergeSelection} />
+        <Button label="Validate #" variant="secondary" size="sm" onClick={onValidateNumber} />
+        <Button label="Validate list" variant="secondary" size="sm" onClick={onValidateList} />
+        <Button label="Clear rule" variant="secondary" size="sm" onClick={onClearValidation} />
         <Button label="Widen column" variant="secondary" size="sm" onClick={onWidenActiveColumn} />
         <Button label="Taller row" variant="secondary" size="sm" onClick={onTallerActiveRow} />
         <span className="toolbar-spacer" />

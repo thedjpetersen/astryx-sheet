@@ -11,7 +11,7 @@ Astryx Sheet is now split as a source package instead of a single demo file. The
 ## Internal Layers
 
 - `src/app/` contains demo application wiring and Astryx theme registration.
-- `src/spreadsheet/Spreadsheet.jsx` owns workbook interaction orchestration: scroll virtualization, selection, editing, resizing, formula bar state, sheet-tab commands, and context menu actions.
+- `src/spreadsheet/Spreadsheet.jsx` owns workbook interaction orchestration: scroll virtualization, selection, editing, resizing, formula bar state, sheet-tab commands, workbook metadata commands, and context menu actions.
 - `src/spreadsheet/components/` contains replaceable UI pieces such as cells, row fragments, sheet tabs, the toolbar, function picker, context menu, and inspector panel.
 - `src/spreadsheet/engine/` contains the React-independent workbook core: sheets, sparse cells, commands, undo/redo, clipboard helpers, dependency graph utilities, and snapshot serialization.
 - `src/spreadsheet/model/` contains spreadsheet primitives: addresses, default data, formulas, dimensions, selections, and initial-state normalization.

@@ -12,7 +12,7 @@ import {NativeContextMenu} from './components/NativeContextMenu.jsx';
 import {RowFragment} from './components/RowFragment.jsx';
 import {SheetTabs} from './components/SheetTabs.jsx';
 import {SpreadsheetToolbar} from './components/SpreadsheetToolbar.jsx';
-import {CommandType, NumberFormatType, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, getCellRawValue, getVisibleRowsForSheet, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook, validateCellValue} from './engine/index.js';
+import {CommandType, NumberFormatType, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, getCellRawValue, getMergeAtCell, getValidationRulesForCell, getVisibleRowsForSheet, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook, validateCellValue} from './engine/index.js';
 import {cellAddress, cellKey, columnName} from './model/address.js';
 import {DEFAULT_GRID_CONFIG} from './model/constants.js';
 import {createDefaultCellData, createDefaultColWidths, createDefaultRowHeights, defaultCellValue} from './model/defaultData.js';
@@ -66,6 +66,13 @@ function firstValidationFailure(sheet, cells) {
     if (!result.valid) return result;
   }
   return null;
+}
+
+function normalizePromptNumber(input) {
+  const text = String(input ?? '').trim();
+  if (!text) return null;
+  const number = Number(text);
+  return Number.isFinite(number) ? number : NaN;
 }
 
 export function Spreadsheet({
@@ -233,7 +240,7 @@ export function Spreadsheet({
   }, [emitWorkbookChange, getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook]);
   const undoLastCommand = useCallback(() => navigateHistory(undoWorkbook, 'Undo'), [navigateHistory]);
   const redoLastCommand = useCallback(() => navigateHistory(redoWorkbook, 'Redo'), [navigateHistory]);
-  const commitWorkbookStructureCommand = useCallback((command, toastMessage) => {
+  const commitWorkbookStructureCommand = useCallback((command, toastMessage, source = 'structure') => {
     const nextWorkbook = dispatchCommand(workbookRef.current, command);
     const committedEntry = nextWorkbook.history[nextWorkbook.history.length - 1];
     workbookRef.current = nextWorkbook;
@@ -244,7 +251,7 @@ export function Spreadsheet({
     setEditor(null);
     setMenu((m) => ({...m, open: false}));
     setFormulaPickerOpen(false);
-    emitWorkbookChange(nextWorkbook, {source: 'structure', command: committedEntry?.command || command});
+    emitWorkbookChange(nextWorkbook, {source, command: committedEntry?.command || command});
     if (toastMessage) showToast(toastMessage);
     return nextWorkbook;
   }, [emitWorkbookChange, showToast, syncFormulaDraftFromWorkbook]);
@@ -490,6 +497,105 @@ export function Spreadsheet({
     emitWorkbookChange(nextWorkbook, {source: 'filter', command});
     showToast('Cleared filter');
   }, [activeSheet.filters.size, emitWorkbookChange, onCellChange, showToast]);
+  const mergeSelection = useCallback(() => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    if (selection.r1 === selection.r2 && selection.c1 === selection.c2) {
+      showToast('Select multiple cells to merge', 'error');
+      return;
+    }
+    const label = `${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`;
+    try {
+      commitWorkbookStructureCommand({
+        type: CommandType.MERGE_RANGE,
+        range: selection,
+        label: `Merge ${label}`,
+      }, `Merged ${label}`, 'metadata');
+    } catch (error) {
+      showToast(error?.message || 'Could not merge cells', 'error');
+    }
+  }, [activeCell, committedSelection, commitWorkbookStructureCommand, showToast]);
+  const unmergeActiveRange = useCallback(() => {
+    const merge = getMergeAtCell(activeSheet, activeCell.row, activeCell.col);
+    if (!merge) {
+      showToast('No merged range at active cell', 'error');
+      return;
+    }
+    const label = `${cellAddress(merge.range.r1, merge.range.c1)}:${cellAddress(merge.range.r2, merge.range.c2)}`;
+    commitWorkbookStructureCommand({
+      type: CommandType.UNMERGE_RANGE,
+      id: merge.id,
+      label: `Unmerge ${label}`,
+    }, `Unmerged ${label}`, 'metadata');
+  }, [activeCell, activeSheet, commitWorkbookStructureCommand, showToast]);
+  const applyNumberValidation = useCallback(() => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    const minInput = typeof window === 'undefined' ? '0' : window.prompt('Minimum number (blank for none)', '');
+    if (minInput == null) return;
+    const maxInput = typeof window === 'undefined' ? '' : window.prompt('Maximum number (blank for none)', '');
+    if (maxInput == null) return;
+    const min = normalizePromptNumber(minInput);
+    const max = normalizePromptNumber(maxInput);
+    if (Number.isNaN(min) || Number.isNaN(max)) {
+      showToast('Validation limits must be numbers', 'error');
+      return;
+    }
+    if (min == null && max == null) {
+      showToast('Enter at least one validation limit', 'error');
+      return;
+    }
+    const rangeLabel = `${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`;
+    const rule = {range: selection, type: 'number', allowBlank: true};
+    if (min != null && max != null) {
+      Object.assign(rule, {operator: 'between', min, max, message: `Enter a number from ${min} to ${max}`});
+    } else if (min != null) {
+      Object.assign(rule, {operator: 'gte', value: min, message: `Enter a number greater than or equal to ${min}`});
+    } else {
+      Object.assign(rule, {operator: 'lte', value: max, message: `Enter a number less than or equal to ${max}`});
+    }
+    commitWorkbookStructureCommand({
+      type: CommandType.SET_VALIDATION,
+      rule,
+      label: `Validate ${rangeLabel}`,
+    }, `Added number validation to ${rangeLabel}`, 'metadata');
+  }, [activeCell, committedSelection, commitWorkbookStructureCommand, showToast]);
+  const applyListValidation = useCallback(() => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    const input = typeof window === 'undefined' ? '' : window.prompt('Accepted values, separated by commas', '');
+    if (input == null) return;
+    const values = input.split(',').map((value) => value.trim()).filter(Boolean);
+    if (!values.length) {
+      showToast('Enter at least one accepted value', 'error');
+      return;
+    }
+    const rangeLabel = `${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`;
+    commitWorkbookStructureCommand({
+      type: CommandType.SET_VALIDATION,
+      rule: {
+        range: selection,
+        type: 'list',
+        values,
+        allowBlank: true,
+        message: `Choose one of: ${values.join(', ')}`,
+      },
+      label: `List validation ${rangeLabel}`,
+    }, `Added list validation to ${rangeLabel}`, 'metadata');
+  }, [activeCell, committedSelection, commitWorkbookStructureCommand, showToast]);
+  const clearValidation = useCallback(() => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    const exactId = `${selection.r1}:${selection.c1}:${selection.r2}:${selection.c2}`;
+    const exactRule = activeSheet.validations.get(exactId);
+    const activeRule = getValidationRulesForCell(activeSheet, activeCell.row, activeCell.col)[0];
+    const rule = exactRule || activeRule;
+    if (!rule) {
+      showToast('No validation rule at active cell', 'error');
+      return;
+    }
+    commitWorkbookStructureCommand({
+      type: CommandType.CLEAR_VALIDATION,
+      id: rule.id,
+      label: 'Clear validation',
+    }, 'Cleared validation', 'metadata');
+  }, [activeCell, activeSheet, committedSelection, commitWorkbookStructureCommand, showToast]);
   const resizeColumn = useCallback((col, size) => {
     const command = {type: CommandType.RESIZE_COLUMN, col, size};
     const nextWorkbook = dispatchCommand(workbookRef.current, command);
@@ -766,6 +872,11 @@ export function Spreadsheet({
           onSortDescending={() => sortSelection('desc')}
           onFilterSelection={filterSelectionByActiveValue}
           onClearFilter={clearActiveFilter}
+          onMergeSelection={mergeSelection}
+          onUnmergeSelection={unmergeActiveRange}
+          onValidateNumber={applyNumberValidation}
+          onValidateList={applyListValidation}
+          onClearValidation={clearValidation}
           onWidenActiveColumn={() => resizeColumn(activeCell.col, colMetrics.size(activeCell.col) + 20)}
           onTallerActiveRow={() => resizeRow(activeCell.row, rowMetrics.size(activeCell.row) + 6)}
           themeName={themeName}
