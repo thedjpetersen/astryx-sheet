@@ -13,6 +13,7 @@
 - Routed row and column size commits through engine resize commands while keeping drag feedback ref-driven.
 - Added grouped commands so compound actions undo/redo as one history entry.
 - Added workbook-range copy commands that preserve cell metadata and translate relative formula references.
+- Added formula dependency graph utilities for dirty-dependent discovery and recalculation ordering.
 
 ## Current Direction
 
@@ -21,4 +22,4 @@ The package should grow around two public layers:
 - A workbook engine that can run without React and eventually own Excel-scale state, formulas, commands, history, import/export, and collaboration hooks.
 - A virtualized React grid that consumes the engine and can be embedded with or without the Astryx toolbar and themes.
 
-The next implementation pass should add richer paste semantics for formatting-oriented external clipboard payloads and larger clipboard ranges, then move toward a dependency graph for recalculation.
+The next implementation pass should add cached formula results and a recalculation scheduler that consumes the dependency graph, then expand paste semantics for formatting-oriented external clipboard payloads and larger ranges.

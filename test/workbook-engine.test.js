@@ -8,6 +8,8 @@ import {
   createWorkbook,
   deserializeWorkbook,
   dispatchCommand,
+  extractFormulaReferences,
+  getFormulaRecalculationOrder,
   getCellDisplayValue,
   getCellRawValue,
   rangeToTsv,
@@ -99,6 +101,26 @@ test('copy range command preserves metadata and translates relative formulas', (
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 2), '=B2*2');
   assert.equal(getCellDisplayValue(workbook, 'sheet-1', 1, 2), '20');
   assert.equal(workbook.sheets.get('sheet-1').cells.get('1:2').note, 'doubled');
+});
+
+test('formula dependency graph finds dirty dependents in recalculation order', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_RANGE,
+    cells: [
+      {row: 0, col: 0, value: '1'},
+      {row: 0, col: 1, formula: '=A1+1'},
+      {row: 0, col: 2, formula: '=SUM(A1:B1)'},
+      {row: 1, col: 0, formula: '=C1*2'},
+    ],
+  });
+
+  assert.deepEqual(extractFormulaReferences('=SUM($A$1:B2)').map((ref) => ref.key), ['0:0', '0:1', '1:0', '1:1']);
+
+  const {dirty, order} = getFormulaRecalculationOrder(workbook.sheets.get('sheet-1'), new Set(['0:0']));
+
+  assert.deepEqual([...dirty], ['0:1', '0:2', '1:0']);
+  assert.deepEqual(order, ['0:1', '0:2', '1:0']);
 });
 
 test('explicit blank cells can override generated defaults', () => {
