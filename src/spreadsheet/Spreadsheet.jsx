@@ -11,7 +11,7 @@ import {InspectorPanel} from './components/InspectorPanel.jsx';
 import {NativeContextMenu} from './components/NativeContextMenu.jsx';
 import {RowFragment} from './components/RowFragment.jsx';
 import {SpreadsheetToolbar} from './components/SpreadsheetToolbar.jsx';
-import {CommandType, NumberFormatType, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook} from './engine/index.js';
+import {CommandType, NumberFormatType, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, getCellRawValue, getVisibleRowsForSheet, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook} from './engine/index.js';
 import {cellAddress, cellKey, columnName} from './model/address.js';
 import {DEFAULT_GRID_CONFIG} from './model/constants.js';
 import {createDefaultCellData, createDefaultColWidths, createDefaultRowHeights, defaultCellValue} from './model/defaultData.js';
@@ -143,8 +143,15 @@ export function Spreadsheet({
 
   const rowOverrides = rowHeightsRef.current;
   const colOverrides = colWidthsRef.current;
+  const filteredRows = useMemo(() => getVisibleRowsForSheet(workbook, activeSheet.id, {getDefaultCellValue}), [activeSheet.id, getDefaultCellValue, workbook]);
+  const effectiveRowOverrides = useMemo(() => {
+    if (!filteredRows?.hiddenRows?.length) return rowOverrides;
+    const next = new Map(rowOverrides);
+    for (const row of filteredRows.hiddenRows) next.set(row, 0);
+    return next;
+  }, [filteredRows, rowOverrides]);
   const effectiveRowHeight = compactRows ? compactRowHeight : defaultRowHeight;
-  const rowMetrics = useMemo(() => makeDimensionHelpers(effectiveRowHeight, rowCount, rowOverrides), [dimensionVersion, effectiveRowHeight, rowCount, rowOverrides]);
+  const rowMetrics = useMemo(() => makeDimensionHelpers(effectiveRowHeight, rowCount, effectiveRowOverrides), [dimensionVersion, effectiveRowHeight, rowCount, effectiveRowOverrides]);
   const colMetrics = useMemo(() => makeDimensionHelpers(defaultColWidth, colCount, colOverrides), [dimensionVersion, defaultColWidth, colCount, colOverrides]);
 
   const showToast = useCallback((message, type = 'info') => toast({body: message, type, isAutoHide: true}), [toast]);
@@ -323,6 +330,41 @@ export function Spreadsheet({
     onCellChange?.({selection, sort: {col: sortCol, direction}, cells: getActiveSheet(result.workbook).cells, workbook: result.workbook, recalculated: result.recalculated});
     showToast(direction === 'asc' ? 'Sorted ascending' : 'Sorted descending');
   }, [activeCell, committedSelection, getDefaultCellValue, onCellChange, showToast, syncFormulaDraftFromWorkbook]);
+  const filterSelectionByActiveValue = useCallback(() => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    if (selection.r2 <= selection.r1) {
+      showToast('Select multiple rows to filter', 'error');
+      return;
+    }
+    const filterCol = activeCell.col >= selection.c1 && activeCell.col <= selection.c2 ? activeCell.col : selection.c1;
+    const value = getCellRawValue(workbookRef.current, activeSheet.id, activeCell.row, filterCol, {getDefaultCellValue});
+    const command = {
+      type: CommandType.SET_FILTER,
+      id: 'selection-filter',
+      range: selection,
+      hasHeader: selection.r1 === 0,
+      criteria: [{col: filterCol, operator: 'equals', value}],
+      label: 'Filter selection',
+    };
+    const nextWorkbook = dispatchCommand(workbookRef.current, command);
+    workbookRef.current = nextWorkbook;
+    setWorkbook(nextWorkbook);
+    setDimensionVersion((v) => v + 1);
+    onCellChange?.({selection, filter: command, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
+    showToast(`Filtered ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`);
+  }, [activeCell, activeSheet.id, committedSelection, getDefaultCellValue, onCellChange, showToast]);
+  const clearActiveFilter = useCallback(() => {
+    if (!activeSheet.filters.size) {
+      showToast('No active filter', 'error');
+      return;
+    }
+    const nextWorkbook = dispatchCommand(workbookRef.current, {type: CommandType.CLEAR_FILTER, id: 'selection-filter', label: 'Clear filter'});
+    workbookRef.current = nextWorkbook;
+    setWorkbook(nextWorkbook);
+    setDimensionVersion((v) => v + 1);
+    onCellChange?.({filter: null, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
+    showToast('Cleared filter');
+  }, [activeSheet.filters.size, onCellChange, showToast]);
   const resizeColumn = useCallback((col, size) => {
     setWorkbook((currentWorkbook) => {
       const nextWorkbook = dispatchCommand(currentWorkbook, {type: CommandType.RESIZE_COLUMN, col, size});
@@ -520,6 +562,7 @@ export function Spreadsheet({
   }, [menu, openEditor, activeCell, showToast, colMetrics, rowMetrics, setCell, cellDataRef, getDefaultCellValue, resetCellDimensions, resizeColumn, resizeRow]);
 
   const rows = useMemo(() => Array.from({length: Math.max(0, view.rowEnd - view.rowStart + 1)}, (_, i) => view.rowStart + i), [view.rowStart, view.rowEnd]);
+  const renderedRows = useMemo(() => filteredRows?.hiddenRows?.length ? rows.filter((row) => rowMetrics.size(row) > 0) : rows, [filteredRows, rowMetrics, rows]);
   const columns = useMemo(() => Array.from({length: Math.max(0, view.colEnd - view.colStart + 1)}, (_, i) => view.colStart + i), [view.colStart, view.colEnd]);
   const calculationStats = useMemo(() => {
     let formulas = 0;
@@ -561,7 +604,7 @@ export function Spreadsheet({
           onToggleFunctionPicker={() => setFormulaPickerOpen((v) => !v)}
           rowCount={rowCount}
           colCount={colCount}
-          mountedCount={rows.length * columns.length}
+          mountedCount={renderedRows.length * columns.length}
           canUndo={workbook.history.length > 0}
           canRedo={workbook.future.length > 0}
           onUndo={undoLastCommand}
@@ -576,6 +619,8 @@ export function Spreadsheet({
           onFormatDate={() => formatSelection({type: NumberFormatType.DATE}, 'date')}
           onSortAscending={() => sortSelection('asc')}
           onSortDescending={() => sortSelection('desc')}
+          onFilterSelection={filterSelectionByActiveValue}
+          onClearFilter={clearActiveFilter}
           onWidenActiveColumn={() => resizeColumn(activeCell.col, colMetrics.size(activeCell.col) + 20)}
           onTallerActiveRow={() => resizeRow(activeCell.row, rowMetrics.size(activeCell.row) + 6)}
           themeName={themeName}
@@ -605,7 +650,7 @@ export function Spreadsheet({
             })}
           </div></div>
           <div className="row-header"><div className="row-layer" ref={rowLayerRef} style={{height: totalHeight, width: sidebarWidth}}>
-            {rows.map((row) => {
+            {renderedRows.map((row) => {
               const inSelection = committedSelection && row >= committedSelection.r1 && row <= committedSelection.r2;
               return <div key={row} className={`row-head-cell ${inSelection ? 'selected' : ''}`} style={{top: rowMetrics.offset(row), height: rowMetrics.size(row)}}>{row + 1}<span className="resize-row" onPointerDown={(e) => beginRowResize(e, row)} /></div>;
             })}
@@ -613,7 +658,7 @@ export function Spreadsheet({
           <div className="viewport" ref={viewportRef} onScroll={onScroll} onContextMenu={onViewportContextMenu} tabIndex={0}>
             <div className="spacer" style={{width: totalWidth, height: totalHeight}}>
               <div className="cell-layer" style={{width: totalWidth, height: totalHeight}}>
-                {rows.map((row) => (
+                {renderedRows.map((row) => (
                   <RowFragment
                     key={row}
                     row={row}
@@ -654,6 +699,7 @@ export function Spreadsheet({
             rowMetaRef={rowMetaRef}
             edits={cellDataRef.current.size}
             calculationStats={calculationStats}
+            filterStats={{active: activeSheet.filters.size, hiddenRows: filteredRows?.hiddenRows?.length || 0}}
             fps={fps}
             dataRef={cellDataRef}
           />

@@ -20,7 +20,7 @@ export function makeDimensionHelpers(defaultSize, count, overrides) {
     const pos = upperBound(index - 1);
     return pos > 0 ? prefix[pos - 1] : 0;
   }
-  function size(index) { return overrides.get(index) || defaultSize; }
+  function size(index) { return overrides.has(index) ? overrides.get(index) : defaultSize; }
   function offset(index) { return index * defaultSize + deltaBefore(index); }
   function total() { return count * defaultSize + (prefix.length ? prefix[prefix.length - 1] : 0); }
   function indexAt(px) {

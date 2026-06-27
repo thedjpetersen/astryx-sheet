@@ -37,6 +37,8 @@ export function SpreadsheetToolbar({
   onFormatDate,
   onSortAscending,
   onSortDescending,
+  onFilterSelection,
+  onClearFilter,
   onWidenActiveColumn,
   onTallerActiveRow,
   themeName,
@@ -95,6 +97,8 @@ export function SpreadsheetToolbar({
         <Button label="Date" variant="secondary" size="sm" onClick={onFormatDate} />
         <Button label="Sort A-Z" variant="secondary" size="sm" onClick={onSortAscending} />
         <Button label="Sort Z-A" variant="secondary" size="sm" onClick={onSortDescending} />
+        <Button label="Filter" variant="secondary" size="sm" onClick={onFilterSelection} />
+        <Button label="Clear filter" variant="secondary" size="sm" onClick={onClearFilter} />
         <Button label="Widen column" variant="secondary" size="sm" onClick={onWidenActiveColumn} />
         <Button label="Taller row" variant="secondary" size="sm" onClick={onTallerActiveRow} />
         <span className="toolbar-spacer" />
