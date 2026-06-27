@@ -33,6 +33,7 @@
 - Added active-sheet commands, fixed generated sheet id collisions, and preserved the previous active sheet when undoing sheet creation.
 - Added a modular sheet-tab React component for switching, adding, renaming, and removing workbook sheets.
 - Added an `onWorkbookChange` callback so embedded hosts can observe workbook-level changes beyond cell edits.
+- Added `initialValidations` support plus React edit, clear, paste, and cell-render validation feedback.
 
 ## Current Direction
 
@@ -41,4 +42,4 @@ The package should grow around two public layers:
 - A workbook engine that can run without React and eventually own Excel-scale state, formulas, commands, history, import/export, and collaboration hooks.
 - A virtualized React grid that consumes the engine and can be embedded with or without the Astryx toolbar and themes.
 
-The next implementation pass should connect merged range and validation metadata to the React renderer and add richer paste semantics for formatting-oriented external clipboard payloads and larger ranges.
+The next implementation pass should connect merged range metadata to the React renderer and add richer paste semantics for formatting-oriented external clipboard payloads and larger ranges.

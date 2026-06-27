@@ -5,7 +5,7 @@ Astryx Sheet is now split as a source package instead of a single demo file. The
 ## Public Surface
 
 - `src/index.js` is the package entry point.
-- `Spreadsheet` is the embeddable component. It accepts grid sizing, initial cell data, initial row/column dimensions, theme defaults or controlled theme values, toolbar and inspector visibility flags, cell/selection callbacks, and a workbook-level change callback for host persistence.
+- `Spreadsheet` is the embeddable component. It accepts grid sizing, initial cell data, initial row/column dimensions, initial data validation rules, theme defaults or controlled theme values, toolbar and inspector visibility flags, cell/selection callbacks, and a workbook-level change callback for host persistence.
 - `src/styles.css` remains a separate stylesheet export for host applications.
 
 ## Internal Layers

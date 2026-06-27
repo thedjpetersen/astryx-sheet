@@ -1,5 +1,5 @@
 import React, {memo, useLayoutEffect, useRef} from 'react';
-import {getCellDisplayValue} from '../engine/index.js';
+import {getCellDisplayValue, validateCellValue} from '../engine/index.js';
 import {cellKey} from '../model/address.js';
 import {defaultCellValue} from '../model/defaultData.js';
 import {Cell} from './Cell.jsx';
@@ -37,6 +37,9 @@ export const RowFragment = memo(function RowFragment({
         const edited = dataRef.current.has(key);
         const rawValue = edited ? dataRef.current.get(key) : getDefaultCellValue(row, col);
         const value = workbook ? getCellDisplayValue(workbook, sheetId, row, col, {getDefaultCellValue}) : rawValue;
+        const sheet = workbook?.sheets.get(sheetId);
+        const validationValue = typeof rawValue === 'string' && rawValue.trim().startsWith('=') ? value : rawValue;
+        const validation = sheet ? validateCellValue(sheet, row, col, validationValue) : null;
         return (
           <Cell
             key={col}
@@ -48,6 +51,7 @@ export const RowFragment = memo(function RowFragment({
             height={height}
             value={value}
             rawValue={rawValue}
+            validation={validation}
             active={activeCell.row === row && activeCell.col === col}
             edited={edited}
             registerCell={registerCell}

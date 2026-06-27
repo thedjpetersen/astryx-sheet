@@ -12,7 +12,7 @@ import {NativeContextMenu} from './components/NativeContextMenu.jsx';
 import {RowFragment} from './components/RowFragment.jsx';
 import {SheetTabs} from './components/SheetTabs.jsx';
 import {SpreadsheetToolbar} from './components/SpreadsheetToolbar.jsx';
-import {CommandType, NumberFormatType, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, getCellRawValue, getVisibleRowsForSheet, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook} from './engine/index.js';
+import {CommandType, NumberFormatType, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, getCellRawValue, getVisibleRowsForSheet, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook, validateCellValue} from './engine/index.js';
 import {cellAddress, cellKey, columnName} from './model/address.js';
 import {DEFAULT_GRID_CONFIG} from './model/constants.js';
 import {createDefaultCellData, createDefaultColWidths, createDefaultRowHeights, defaultCellValue} from './model/defaultData.js';
@@ -38,6 +38,36 @@ function createNextSheetName(workbook) {
   }
 }
 
+function rawValueForValidation(input) {
+  if (input && typeof input === 'object' && !Array.isArray(input)) {
+    if (input.formula) {
+      const formula = String(input.formula);
+      return formula.trim().startsWith('=') ? formula : `=${formula}`;
+    }
+    if ('value' in input) return input.value ?? '';
+    return '';
+  }
+  return input ?? '';
+}
+
+function isFormulaLike(value) {
+  return typeof value === 'string' && value.trim().startsWith('=');
+}
+
+function validationFailureMessage(result) {
+  return result?.failures?.[0]?.message || `${result?.address || 'Cell'} does not match its validation rule`;
+}
+
+function firstValidationFailure(sheet, cells) {
+  for (const item of cells) {
+    const rawValue = rawValueForValidation(item.cell);
+    if (isFormulaLike(rawValue)) continue;
+    const result = validateCellValue(sheet, item.row, item.col, rawValue);
+    if (!result.valid) return result;
+  }
+  return null;
+}
+
 export function Spreadsheet({
   title = DEFAULT_TITLE,
   subtitle = DEFAULT_SUBTITLE,
@@ -45,6 +75,7 @@ export function Spreadsheet({
   initialCells,
   initialRowHeights,
   initialColWidths,
+  initialValidations,
   getDefaultCellValue = defaultCellValue,
   defaultThemeName = 'neutral',
   themeName: controlledThemeName,
@@ -105,6 +136,7 @@ export function Spreadsheet({
       cells: initialCells ?? createDefaultCellData(),
       rowHeights: initialRowHeights ?? createDefaultRowHeights(),
       colWidths: initialColWidths ?? createDefaultColWidths(),
+      validations: initialValidations,
     }],
   }));
   const workbookRef = useRef(workbook);
@@ -175,6 +207,12 @@ export function Spreadsheet({
       ...detail,
     });
   }, [onWorkbookChange]);
+  const validateEditCells = useCallback((cells, workbookToValidate = workbookRef.current) => {
+    const failure = firstValidationFailure(getActiveSheet(workbookToValidate), cells);
+    if (!failure) return true;
+    showToast(validationFailureMessage(failure), 'error');
+    return false;
+  }, [showToast]);
   const syncFormulaDraftFromWorkbook = useCallback((nextWorkbook, point = activeCell) => {
     setFormulaDraft(readCell(createSheetDataRef(getActiveSheet(nextWorkbook)), point.row, point.col, getDefaultCellValue));
   }, [activeCell, getDefaultCellValue]);
@@ -267,6 +305,7 @@ export function Spreadsheet({
     navigator.clipboard.readText().then((text) => {
       if (!text) return;
       const command = createPasteTsvCommand(text, activeCell);
+      if (!validateEditCells(command.cells || [])) return;
       const result = dispatchCommandWithRecalculation(workbookRef.current, command, {getDefaultCellValue});
       const nextWorkbook = result.workbook;
       workbookRef.current = nextWorkbook;
@@ -276,7 +315,7 @@ export function Spreadsheet({
       emitWorkbookChange(nextWorkbook, {source: 'clipboard', command, recalculated: result.recalculated});
       showToast('Pasted cells');
     }, () => showToast('Clipboard blocked', 'error'));
-  }, [activeCell, emitWorkbookChange, getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook]);
+  }, [activeCell, emitWorkbookChange, getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook, validateEditCells]);
   const setActiveCell = useCallback((point) => {
     const nextPoint = clampPoint(point, gridConfig);
     setActiveCellState(nextPoint);
@@ -288,6 +327,7 @@ export function Spreadsheet({
   }, [onSelectionChange]);
   const setCell = useCallback((row, col, value) => {
     const nextCell = value === getDefaultCellValue(row, col) ? null : value;
+    if (!validateEditCells([{row, col, cell: value}])) return false;
     const command = {type: CommandType.SET_CELL, row, col, cell: nextCell};
     const result = dispatchCommandWithRecalculation(workbookRef.current, command, {getDefaultCellValue});
     const nextWorkbook = result.workbook;
@@ -296,7 +336,8 @@ export function Spreadsheet({
     onCellChange?.({row, col, address: cellAddress(row, col), value, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook, recalculated: result.recalculated});
     emitWorkbookChange(nextWorkbook, {source: 'cell', command, recalculated: result.recalculated});
     setDataVersion((v) => v + 1);
-  }, [emitWorkbookChange, getDefaultCellValue, onCellChange]);
+    return true;
+  }, [emitWorkbookChange, getDefaultCellValue, onCellChange, validateEditCells]);
   const registerCell = useCallback((row, col, rect) => {
     const key = cellKey(row, col);
     if (rect) cellMetaRef.current.set(key, rect);
@@ -347,7 +388,7 @@ export function Spreadsheet({
   }, [cellDataRef, getDefaultCellValue]);
   const commitEditor = useCallback((value = editor?.value) => {
     if (!editor) return;
-    setCell(editor.row, editor.col, value ?? '');
+    if (!setCell(editor.row, editor.col, value ?? '')) return;
     if (editor.row === activeCell.row && editor.col === activeCell.col) setFormulaDraft(value ?? '');
     setEditor(null);
     showToast(`Updated ${cellAddress(editor.row, editor.col)}`);
@@ -358,6 +399,7 @@ export function Spreadsheet({
     if (count > 50000) return showToast('Selection too large for demo clear', 'error');
     const cells = [];
     for (let r = selection.r1; r <= selection.r2; r++) for (let c = selection.c1; c <= selection.c2; c++) cells.push({row: r, col: c, cell: {value: ''}});
+    if (!validateEditCells(cells)) return;
     const command = {type: CommandType.SET_RANGE, cells};
     const result = dispatchCommandWithRecalculation(workbookRef.current, command, {getDefaultCellValue});
     const nextWorkbook = result.workbook;
@@ -368,7 +410,7 @@ export function Spreadsheet({
     setDataVersion((v) => v + 1);
     if (activeCell.row >= selection.r1 && activeCell.row <= selection.r2 && activeCell.col >= selection.c1 && activeCell.col <= selection.c2) setFormulaDraft('');
     showToast(`Cleared ${count.toLocaleString()} cell${count === 1 ? '' : 's'}`);
-  }, [committedSelection, activeCell, emitWorkbookChange, getDefaultCellValue, showToast, onCellChange]);
+  }, [committedSelection, activeCell, emitWorkbookChange, getDefaultCellValue, showToast, onCellChange, validateEditCells]);
   const formatSelection = useCallback((format, label) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     const command = {
@@ -620,23 +662,38 @@ export function Spreadsheet({
   }, [rowMetrics, colMetrics, openContextMenu]);
   const beginColResize = useCallback((event, col) => { event.preventDefault(); event.stopPropagation(); resizeRef.current = {kind: 'col', index: col, startX: event.clientX, startSize: colMetrics.size(col), hadOverride: colWidthsRef.current.has(col)}; }, [colMetrics]);
   const beginRowResize = useCallback((event, row) => { event.preventDefault(); event.stopPropagation(); resizeRef.current = {kind: 'row', index: row, startY: event.clientY, startSize: rowMetrics.size(row), hadOverride: rowHeightsRef.current.has(row)}; }, [rowMetrics]);
-  const commitFormula = useCallback(() => { setCell(activeCell.row, activeCell.col, formulaDraft); showToast(`Updated ${cellAddress(activeCell.row, activeCell.col)}`); }, [activeCell, formulaDraft, setCell, showToast]);
+  const commitFormula = useCallback(() => {
+    if (setCell(activeCell.row, activeCell.col, formulaDraft)) showToast(`Updated ${cellAddress(activeCell.row, activeCell.col)}`);
+  }, [activeCell, formulaDraft, setCell, showToast]);
   const insertFunction = useCallback((name) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     const range = `${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`;
     const value = name === 'ARITH' ? `=${cellAddress(activeCell.row, Math.max(0, activeCell.col - 1))}+${cellAddress(activeCell.row, Math.max(0, activeCell.col - 2))}` : `=${name}(${range})`;
-    setFormulaDraft(value); setCell(activeCell.row, activeCell.col, value); setFormulaPickerOpen(false); showToast(`Inserted ${name === 'ARITH' ? 'formula' : name} in ${cellAddress(activeCell.row, activeCell.col)}`);
+    setFormulaDraft(value);
+    if (setCell(activeCell.row, activeCell.col, value)) {
+      setFormulaPickerOpen(false);
+      showToast(`Inserted ${name === 'ARITH' ? 'formula' : name} in ${cellAddress(activeCell.row, activeCell.col)}`);
+    }
   }, [committedSelection, activeCell, setCell, showToast]);
   const handleMenuAction = useCallback((action) => {
     const {row, col} = menu;
     if (action === 'edit') openEditor(row, col);
-    if (action === 'clear') { setCell(row, col, ''); if (activeCell.row === row && activeCell.col === col) setFormulaDraft(''); showToast(`Cleared ${cellAddress(row, col)}`); }
+    if (action === 'clear' && setCell(row, col, '')) {
+      if (activeCell.row === row && activeCell.col === col) setFormulaDraft('');
+      showToast(`Cleared ${cellAddress(row, col)}`);
+    }
     if (action === 'copy') navigator.clipboard?.writeText(readCell(cellDataRef, row, col, getDefaultCellValue)).then(() => showToast('Copied value'), () => showToast('Clipboard blocked', 'error'));
     if (action === 'address') navigator.clipboard?.writeText(cellAddress(row, col)).then(() => showToast('Copied address'), () => showToast('Clipboard blocked', 'error'));
     if (action === 'widen') resizeColumn(col, colMetrics.size(col) + 20);
     if (action === 'taller') resizeRow(row, rowMetrics.size(row) + 6);
     if (action === 'resetSize') resetCellDimensions(row, col);
-    if (action === 'sample') { const value = `=SUM(B${row + 1}:E${row + 1})`; setCell(row, col, value); if (activeCell.row === row && activeCell.col === col) setFormulaDraft(value); showToast(`Formula set in ${cellAddress(row, col)}`); }
+    if (action === 'sample') {
+      const value = `=SUM(B${row + 1}:E${row + 1})`;
+      if (setCell(row, col, value)) {
+        if (activeCell.row === row && activeCell.col === col) setFormulaDraft(value);
+        showToast(`Formula set in ${cellAddress(row, col)}`);
+      }
+    }
     setMenu((m) => ({...m, open: false}));
   }, [menu, openEditor, activeCell, showToast, colMetrics, rowMetrics, setCell, cellDataRef, getDefaultCellValue, resetCellDimensions, resizeColumn, resizeRow]);
 
