@@ -8,6 +8,7 @@
 - Added the first React-independent workbook engine in `src/spreadsheet/engine/`.
 - Covered the engine with `node:test` tests for sparse edits, formula display, undo/redo, TSV paste/copy, clearing ranges, resizing, and snapshot round trips.
 - Routed spreadsheet cell edits and selection clears through the workbook command dispatcher while preserving the virtual grid's ref-driven resize path.
+- Added toolbar and keyboard undo/redo actions backed by the engine history.
 
 ## Current Direction
 
@@ -16,4 +17,4 @@ The package should grow around two public layers:
 - A workbook engine that can run without React and eventually own Excel-scale state, formulas, commands, history, import/export, and collaboration hooks.
 - A virtualized React grid that consumes the engine and can be embedded with or without the Astryx toolbar and themes.
 
-The next implementation pass should move resizing, paste, and undo/redo keyboard commands fully onto the engine dispatcher so UI actions and external API calls share one command history.
+The next implementation pass should move resizing and paste fully onto the engine dispatcher so UI actions and external API calls share one command history.

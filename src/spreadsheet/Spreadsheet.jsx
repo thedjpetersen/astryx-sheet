@@ -11,7 +11,7 @@ import {InspectorPanel} from './components/InspectorPanel.jsx';
 import {NativeContextMenu} from './components/NativeContextMenu.jsx';
 import {RowFragment} from './components/RowFragment.jsx';
 import {SpreadsheetToolbar} from './components/SpreadsheetToolbar.jsx';
-import {CommandType, createSheetDataRef, createWorkbook, dispatchCommand, getActiveSheet} from './engine/index.js';
+import {CommandType, createSheetDataRef, createWorkbook, dispatchCommand, getActiveSheet, redo as redoWorkbook, undo as undoWorkbook} from './engine/index.js';
 import {cellAddress, cellKey, columnName} from './model/address.js';
 import {DEFAULT_GRID_CONFIG} from './model/constants.js';
 import {createDefaultCellData, createDefaultColWidths, createDefaultRowHeights, defaultCellValue} from './model/defaultData.js';
@@ -97,6 +97,8 @@ export function Spreadsheet({
       colWidths: initialColWidths ?? createDefaultColWidths(),
     }],
   }));
+  const workbookRef = useRef(workbook);
+  workbookRef.current = workbook;
   const activeSheet = getActiveSheet(workbook);
   const cellDataRef = useMemo(() => createSheetDataRef(activeSheet), [activeSheet]);
   const rowHeightsRef = useRef(activeSheet.rowHeights);
@@ -146,6 +148,22 @@ export function Spreadsheet({
   const colMetrics = useMemo(() => makeDimensionHelpers(defaultColWidth, colCount, colOverrides), [dimensionVersion, defaultColWidth, colCount, colOverrides]);
 
   const showToast = useCallback((message, type = 'info') => toast({body: message, type, isAutoHide: true}), [toast]);
+  const syncFormulaDraftFromWorkbook = useCallback((nextWorkbook, point = activeCell) => {
+    setFormulaDraft(readCell(createSheetDataRef(getActiveSheet(nextWorkbook)), point.row, point.col, getDefaultCellValue));
+  }, [activeCell, getDefaultCellValue]);
+  const navigateHistory = useCallback((navigate, label) => {
+    const currentWorkbook = workbookRef.current;
+    const nextWorkbook = navigate(currentWorkbook);
+    if (nextWorkbook === currentWorkbook) return;
+    workbookRef.current = nextWorkbook;
+    setWorkbook(nextWorkbook);
+    setDataVersion((v) => v + 1);
+    setDimensionVersion((v) => v + 1);
+    syncFormulaDraftFromWorkbook(nextWorkbook);
+    showToast(label);
+  }, [showToast, syncFormulaDraftFromWorkbook]);
+  const undoLastCommand = useCallback(() => navigateHistory(undoWorkbook, 'Undo'), [navigateHistory]);
+  const redoLastCommand = useCallback(() => navigateHistory(redoWorkbook, 'Redo'), [navigateHistory]);
   const setActiveCell = useCallback((point) => {
     const nextPoint = clampPoint(point, gridConfig);
     setActiveCellState(nextPoint);
@@ -159,6 +177,7 @@ export function Spreadsheet({
     const nextCell = value === getDefaultCellValue(row, col) ? null : value;
     setWorkbook((currentWorkbook) => {
       const nextWorkbook = dispatchCommand(currentWorkbook, {type: CommandType.SET_CELL, row, col, cell: nextCell});
+      workbookRef.current = nextWorkbook;
       onCellChange?.({row, col, address: cellAddress(row, col), value, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
       return nextWorkbook;
     });
@@ -227,6 +246,7 @@ export function Spreadsheet({
     for (let r = selection.r1; r <= selection.r2; r++) for (let c = selection.c1; c <= selection.c2; c++) cells.push({row: r, col: c, cell: {value: ''}});
     setWorkbook((currentWorkbook) => {
       const nextWorkbook = dispatchCommand(currentWorkbook, {type: CommandType.SET_RANGE, cells});
+      workbookRef.current = nextWorkbook;
       onCellChange?.({selection, value: '', cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
       return nextWorkbook;
     });
@@ -313,13 +333,16 @@ export function Spreadsheet({
       const typingInInput = tag === 'INPUT' || tag === 'TEXTAREA';
       if (event.key === 'Escape') { setEditor(null); setMenu((m) => ({...m, open: false})); setFormulaPickerOpen(false); return; }
       if (typingInInput || editor) return;
+      const key = event.key.toLowerCase();
+      if ((event.metaKey || event.ctrlKey) && key === 'z') { event.preventDefault(); event.shiftKey ? redoLastCommand() : undoLastCommand(); return; }
+      if ((event.metaKey || event.ctrlKey) && key === 'y') { event.preventDefault(); redoLastCommand(); return; }
       if (event.key === 'Enter') { event.preventDefault(); openEditor(activeCell.row, activeCell.col); }
       else if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); clearSelection(); }
       else if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); openEditor(activeCell.row, activeCell.col, event.key); }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activeCell, editor, openEditor, clearSelection]);
+  }, [activeCell, editor, openEditor, clearSelection, redoLastCommand, undoLastCommand]);
 
   const onScroll = useCallback((event) => {
     const {scrollLeft, scrollTop} = event.currentTarget;
@@ -414,6 +437,10 @@ export function Spreadsheet({
           rowCount={rowCount}
           colCount={colCount}
           mountedCount={rows.length * columns.length}
+          canUndo={workbook.history.length > 0}
+          canRedo={workbook.future.length > 0}
+          onUndo={undoLastCommand}
+          onRedo={redoLastCommand}
           onEditActiveCell={() => openEditor(activeCell.row, activeCell.col)}
           onClearSelection={clearSelection}
           onWidenActiveColumn={() => { colWidthsRef.current.set(activeCell.col, colMetrics.size(activeCell.col) + 20); setDimensionVersion((v) => v + 1); }}

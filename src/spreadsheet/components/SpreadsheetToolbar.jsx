@@ -23,6 +23,10 @@ export function SpreadsheetToolbar({
   rowCount,
   colCount,
   mountedCount,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   onEditActiveCell,
   onClearSelection,
   onWidenActiveColumn,
@@ -71,6 +75,8 @@ export function SpreadsheetToolbar({
         </div>
       ) : null}
       <div className="ribbon-tools">
+        <Button label="Undo" variant="secondary" size="sm" onClick={onUndo} isDisabled={!canUndo} />
+        <Button label="Redo" variant="secondary" size="sm" onClick={onRedo} isDisabled={!canRedo} />
         <Button label="Edit cell" variant="secondary" size="sm" onClick={onEditActiveCell} />
         <Button label="Clear" variant="secondary" size="sm" onClick={onClearSelection} />
         <Button label="Widen column" variant="secondary" size="sm" onClick={onWidenActiveColumn} />
