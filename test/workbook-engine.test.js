@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {cellAddress} from '../src/spreadsheet/model/address.js';
 import {
   CommandType,
+  createCopyRangeCommand,
   createPasteTsvCommand,
   createWorkbook,
   deserializeWorkbook,
@@ -45,6 +46,30 @@ test('undo and redo restore previous workbook state', () => {
   assert.equal(workbook.sheets.get('sheet-1').colWidths.get(1), 180);
 });
 
+test('batch commands undo and redo as one history entry', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.BATCH,
+    label: 'Batch edit',
+    commands: [
+      {type: CommandType.SET_CELL, row: 0, col: 0, value: 'A'},
+      {type: CommandType.SET_CELL, row: 0, col: 1, value: 'B'},
+    ],
+  });
+
+  assert.equal(workbook.history.length, 1);
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 0, 0), 'A');
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 0, 1), 'B');
+
+  workbook = undo(workbook);
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 0, 0), '');
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 0, 1), '');
+
+  workbook = redo(workbook);
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 0, 0), 'A');
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 0, 1), 'B');
+});
+
 test('range clear and TSV paste are command-compatible', () => {
   let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
   workbook = dispatchCommand(workbook, createPasteTsvCommand('Name\tScore\nAda\t42', {row: 0, col: 0}));
@@ -56,6 +81,24 @@ test('range clear and TSV paste are command-compatible', () => {
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 0), '');
   workbook = undo(workbook);
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 0), 'Ada');
+});
+
+test('copy range command preserves metadata and translates relative formulas', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_RANGE,
+    cells: [
+      {row: 0, col: 0, cell: {value: '10', style: {fontWeight: 'bold'}}},
+      {row: 0, col: 1, cell: {formula: '=A1*2', note: 'doubled'}},
+    ],
+  });
+
+  workbook = dispatchCommand(workbook, createCopyRangeCommand(workbook, {r1: 0, c1: 0, r2: 0, c2: 1}, {row: 1, col: 1}));
+
+  assert.deepEqual(workbook.sheets.get('sheet-1').cells.get('1:1').style, {fontWeight: 'bold'});
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 2), '=B2*2');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 1, 2), '20');
+  assert.equal(workbook.sheets.get('sheet-1').cells.get('1:2').note, 'doubled');
 });
 
 test('explicit blank cells can override generated defaults', () => {

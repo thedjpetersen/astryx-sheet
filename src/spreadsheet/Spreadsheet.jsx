@@ -301,9 +301,13 @@ export function Spreadsheet({
     const sheet = getActiveSheet(workbookRef.current);
     if (!sheet.rowHeights.has(row) && !sheet.colWidths.has(col)) return;
     setWorkbook((currentWorkbook) => {
-      let nextWorkbook = currentWorkbook;
-      if (getActiveSheet(nextWorkbook).colWidths.has(col)) nextWorkbook = dispatchCommand(nextWorkbook, {type: CommandType.RESIZE_COLUMN, col, size: null});
-      if (getActiveSheet(nextWorkbook).rowHeights.has(row)) nextWorkbook = dispatchCommand(nextWorkbook, {type: CommandType.RESIZE_ROW, row, size: null});
+      const currentSheet = getActiveSheet(currentWorkbook);
+      const commands = [];
+      if (currentSheet.colWidths.has(col)) commands.push({type: CommandType.RESIZE_COLUMN, col, size: null});
+      if (currentSheet.rowHeights.has(row)) commands.push({type: CommandType.RESIZE_ROW, row, size: null});
+      const nextWorkbook = commands.length === 1
+        ? dispatchCommand(currentWorkbook, commands[0])
+        : dispatchCommand(currentWorkbook, {type: CommandType.BATCH, commands, label: 'Reset dimensions'});
       workbookRef.current = nextWorkbook;
       return nextWorkbook;
     });

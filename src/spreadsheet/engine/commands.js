@@ -4,6 +4,7 @@ import {cloneCellRecord, normalizeCellRecord} from './cells.js';
 import {cloneSheet, cloneWorkbook, createSheet, getSheet, setCellRecord, withClonedSheet} from './workbook.js';
 
 export const CommandType = {
+  BATCH: 'BATCH',
   SET_CELL: 'SET_CELL',
   SET_RANGE: 'SET_RANGE',
   CLEAR_RANGE: 'CLEAR_RANGE',
@@ -129,8 +130,23 @@ function applyRenameSheet(workbook, command) {
   };
 }
 
+function applyBatch(workbook, command) {
+  const inverses = [];
+  let nextWorkbook = workbook;
+  for (const childCommand of command.commands || []) {
+    const result = applyWorkbookCommand(nextWorkbook, childCommand);
+    nextWorkbook = result.workbook;
+    inverses.unshift(result.inverse);
+  }
+  return {
+    workbook: nextWorkbook,
+    inverse: {type: CommandType.BATCH, commands: inverses, label: command.label},
+  };
+}
+
 export function applyWorkbookCommand(workbook, command) {
   if (!command?.type) throw new Error('Workbook command requires a type');
+  if (command.type === CommandType.BATCH) return applyBatch(workbook, command);
   if (command.type === CommandType.SET_CELL) return applySetCell(workbook, command);
   if (command.type === CommandType.SET_RANGE) return applySetRange(workbook, command);
   if (command.type === CommandType.CLEAR_RANGE) return applyClearRange(workbook, command);
