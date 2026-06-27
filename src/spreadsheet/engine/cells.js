@@ -16,6 +16,8 @@ export function normalizeCellRecord(input) {
       record.formula = formula.trim().startsWith('=') ? formula : `=${formula}`;
     }
     if ('value' in input && input.value !== undefined) record.value = input.value;
+    if ('computedValue' in input && input.computedValue !== undefined) record.computedValue = input.computedValue;
+    if ('error' in input && input.error !== undefined) record.error = input.error;
     if (input.type) record.type = input.type;
     if (input.format) record.format = {...input.format};
     if (input.style) record.style = {...input.style};

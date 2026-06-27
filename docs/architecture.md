@@ -19,6 +19,6 @@ Astryx Sheet is now split as a source package instead of a single demo file. The
 
 ## Growth Path
 
-The next substantial split is to move the React component from direct sparse maps onto the workbook engine. The engine already owns sheets, ranges, commands, undo/redo, TSV clipboard import/export, formula dependency graph utilities, and persistence snapshots. It still needs cached recalculation scheduling, rich formatting, merged cells, named ranges, filters, sorting, workbook-level metadata, and import/export adapters before it can credibly approach Excel parity.
+The next substantial split is to move the React component from direct sparse maps onto the workbook engine. The engine already owns sheets, ranges, commands, undo/redo, TSV clipboard import/export, formula dependency graph utilities, cached recalculation helpers, and persistence snapshots. It still needs automatic recalculation scheduling, rich formatting, merged cells, named ranges, filters, sorting, workbook-level metadata, and import/export adapters before it can credibly approach Excel parity.
 
 The React layer should become a view/controller over the engine rather than the source of workbook truth. That preserves embeddability: host applications should be able to use the engine without React, use the React grid with their own toolbar, or mount the complete Astryx-flavored experience.

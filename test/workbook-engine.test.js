@@ -10,8 +10,10 @@ import {
   dispatchCommand,
   extractFormulaReferences,
   getFormulaRecalculationOrder,
+  getCachedCellDisplayValue,
   getCellDisplayValue,
   getCellRawValue,
+  recalculateWorkbook,
   rangeToTsv,
   redo,
   serializeWorkbook,
@@ -121,6 +123,31 @@ test('formula dependency graph finds dirty dependents in recalculation order', (
 
   assert.deepEqual([...dirty], ['0:1', '0:2', '1:0']);
   assert.deepEqual(order, ['0:1', '0:2', '1:0']);
+});
+
+test('recalculation caches full and dirty formula results', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_RANGE,
+    cells: [
+      {row: 0, col: 0, value: '2'},
+      {row: 0, col: 1, formula: '=A1+1'},
+      {row: 0, col: 2, formula: '=B1+1'},
+    ],
+  });
+
+  let result = recalculateWorkbook(workbook);
+  workbook = result.workbook;
+  assert.deepEqual(result.recalculated, ['0:1', '0:2']);
+  assert.equal(getCachedCellDisplayValue(workbook.sheets.get('sheet-1'), 0, 2), '4');
+
+  workbook = dispatchCommand(workbook, {type: CommandType.SET_CELL, row: 0, col: 0, value: '10'});
+  result = recalculateWorkbook(workbook, {changedKeys: new Set(['0:0'])});
+  workbook = result.workbook;
+
+  assert.deepEqual(result.recalculated, ['0:1', '0:2']);
+  assert.equal(getCachedCellDisplayValue(workbook.sheets.get('sheet-1'), 0, 1), '11');
+  assert.equal(getCachedCellDisplayValue(workbook.sheets.get('sheet-1'), 0, 2), '12');
 });
 
 test('explicit blank cells can override generated defaults', () => {
