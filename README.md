@@ -35,6 +35,8 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - CSV and TSV import/export helpers for embedding and data interchange
 - Workbook-level named ranges with undo/redo and snapshot serialization
 - Named ranges participate in formula dependency tracking and cached recalculation
+- Multi-sheet workbook commands for adding, activating, renaming, and removing sheets with undo/redo
+- React sheet tabs for switching, adding, renaming, and removing workbook sheets from the embedded UI
 - Sheet filter state with criteria evaluation, visible-row selectors, undo/redo, and snapshot serialization
 - React toolbar filtering that collapses hidden rows through the virtualized row metrics
 - Merged range metadata with overlap validation, undo/redo, selectors, and snapshot serialization
@@ -45,7 +47,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Live inspector panel showing mounted cells, sparse overrides, effect-registered geometry, and approximate FPS
 - Demo options for theme selection (default: Neutral), dark mode, inspector visibility, compact row density, and high-contrast selection
 - Embeddable source package exports for the React `Spreadsheet` component and a React-independent workbook engine
-- Workbook engine primitives for sparse sheets, cells, formulas, commands, undo/redo, TSV clipboard data, and JSON snapshots
+- Workbook engine primitives for sparse sheets, active-sheet state, cells, formulas, commands, undo/redo, TSV clipboard data, and JSON snapshots
 
 ## Why this exists
 

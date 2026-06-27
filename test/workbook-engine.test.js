@@ -87,6 +87,46 @@ test('batch commands undo and redo as one history entry', () => {
   assert.equal(getCellRawValue(workbook, 'sheet-1', 0, 1), 'B');
 });
 
+test('sheet commands create unique ids and restore active sheet history', () => {
+  let workbook = createWorkbook({sheets: [
+    {id: 'sheet-1', name: 'Inputs'},
+    {id: 'sheet-2', name: 'Model'},
+  ], activeSheetId: 'sheet-2'});
+
+  workbook = dispatchCommand(workbook, {type: CommandType.ADD_SHEET, sheet: {name: 'Forecast'}});
+  const addedSheetId = workbook.activeSheetId;
+  assert.notEqual(addedSheetId, 'sheet-1');
+  assert.notEqual(addedSheetId, 'sheet-2');
+  assert.equal(workbook.sheets.get(addedSheetId).name, 'Forecast');
+
+  workbook = undo(workbook);
+  assert.equal(workbook.activeSheetId, 'sheet-2');
+  assert.equal(workbook.sheets.has(addedSheetId), false);
+
+  workbook = redo(workbook);
+  assert.equal(workbook.activeSheetId, addedSheetId);
+
+  workbook = dispatchCommand(workbook, {type: CommandType.SET_ACTIVE_SHEET, sheetId: 'sheet-1'});
+  assert.equal(workbook.activeSheetId, 'sheet-1');
+  workbook = undo(workbook);
+  assert.equal(workbook.activeSheetId, addedSheetId);
+  workbook = redo(workbook);
+  assert.equal(workbook.activeSheetId, 'sheet-1');
+
+  workbook = dispatchCommand(workbook, {type: CommandType.RENAME_SHEET, sheetId: addedSheetId, name: 'Plan'});
+  assert.equal(workbook.sheets.get(addedSheetId).name, 'Plan');
+
+  workbook = dispatchCommand(workbook, {type: CommandType.SET_ACTIVE_SHEET, sheetId: addedSheetId});
+  workbook = dispatchCommand(workbook, {type: CommandType.REMOVE_SHEET});
+  assert.equal(workbook.activeSheetId, 'sheet-1');
+  workbook = undo(workbook);
+  assert.equal(workbook.activeSheetId, addedSheetId);
+  assert.equal(workbook.sheets.get(addedSheetId).name, 'Plan');
+
+  assert.throws(() => dispatchCommand(workbook, {type: CommandType.SET_ACTIVE_SHEET, sheetId: 'missing'}), /Unknown sheet/);
+  assert.throws(() => dispatchCommand(workbook, {type: CommandType.ADD_SHEET, sheet: {id: 'sheet-1'}}), /already exists/);
+});
+
 test('range clear and TSV paste are command-compatible', () => {
   let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
   workbook = dispatchCommand(workbook, createPasteTsvCommand('Name\tScore\nAda\t42', {row: 0, col: 0}));

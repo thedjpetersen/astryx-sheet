@@ -10,6 +10,7 @@ import {FunctionPicker} from './components/FunctionPicker.jsx';
 import {InspectorPanel} from './components/InspectorPanel.jsx';
 import {NativeContextMenu} from './components/NativeContextMenu.jsx';
 import {RowFragment} from './components/RowFragment.jsx';
+import {SheetTabs} from './components/SheetTabs.jsx';
 import {SpreadsheetToolbar} from './components/SpreadsheetToolbar.jsx';
 import {CommandType, NumberFormatType, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, getCellRawValue, getVisibleRowsForSheet, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook} from './engine/index.js';
 import {cellAddress, cellKey, columnName} from './model/address.js';
@@ -27,6 +28,14 @@ function clampPoint(point, gridConfig) {
     row: Math.max(0, Math.min(gridConfig.rows - 1, point.row)),
     col: Math.max(0, Math.min(gridConfig.cols - 1, point.col)),
   };
+}
+
+function createNextSheetName(workbook) {
+  const names = new Set(Array.from(workbook.sheets.values(), (sheet) => sheet.name));
+  for (let index = workbook.sheetOrder.length + 1; ; index++) {
+    const name = `Sheet${index}`;
+    if (!names.has(name)) return name;
+  }
 }
 
 export function Spreadsheet({
@@ -172,6 +181,58 @@ export function Spreadsheet({
   }, [getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook]);
   const undoLastCommand = useCallback(() => navigateHistory(undoWorkbook, 'Undo'), [navigateHistory]);
   const redoLastCommand = useCallback(() => navigateHistory(redoWorkbook, 'Redo'), [navigateHistory]);
+  const commitWorkbookStructureCommand = useCallback((command, toastMessage) => {
+    const nextWorkbook = dispatchCommand(workbookRef.current, command);
+    workbookRef.current = nextWorkbook;
+    setWorkbook(nextWorkbook);
+    setDataVersion((v) => v + 1);
+    setDimensionVersion((v) => v + 1);
+    syncFormulaDraftFromWorkbook(nextWorkbook);
+    setEditor(null);
+    setMenu((m) => ({...m, open: false}));
+    setFormulaPickerOpen(false);
+    if (toastMessage) showToast(toastMessage);
+    return nextWorkbook;
+  }, [showToast, syncFormulaDraftFromWorkbook]);
+  const activateSheet = useCallback((sheetId) => {
+    const currentWorkbook = workbookRef.current;
+    if (sheetId === currentWorkbook.activeSheetId) return;
+    const sheetName = currentWorkbook.sheets.get(sheetId)?.name || sheetId;
+    commitWorkbookStructureCommand({type: CommandType.SET_ACTIVE_SHEET, sheetId, label: `Switch to ${sheetName}`}, `Switched to ${sheetName}`);
+  }, [commitWorkbookStructureCommand]);
+  const addSheet = useCallback(() => {
+    const name = createNextSheetName(workbookRef.current);
+    commitWorkbookStructureCommand({
+      type: CommandType.ADD_SHEET,
+      sheet: {name, rowCount, colCount},
+      label: `Add ${name}`,
+    }, `Added ${name}`);
+  }, [colCount, commitWorkbookStructureCommand, rowCount]);
+  const renameActiveSheet = useCallback(() => {
+    const currentWorkbook = workbookRef.current;
+    const sheet = getActiveSheet(currentWorkbook);
+    const nextName = typeof window === 'undefined' ? '' : window.prompt('Rename sheet', sheet.name)?.trim();
+    if (!nextName || nextName === sheet.name) return;
+    const nameExists = Array.from(currentWorkbook.sheets.values()).some((item) => (
+      item.id !== sheet.id && item.name.toLowerCase() === nextName.toLowerCase()
+    ));
+    if (nameExists) {
+      showToast('Sheet name already exists', 'error');
+      return;
+    }
+    commitWorkbookStructureCommand({type: CommandType.RENAME_SHEET, sheetId: sheet.id, name: nextName, label: `Rename ${sheet.name}`}, `Renamed sheet to ${nextName}`);
+  }, [commitWorkbookStructureCommand, showToast]);
+  const removeActiveSheet = useCallback(() => {
+    const currentWorkbook = workbookRef.current;
+    if (currentWorkbook.sheetOrder.length <= 1) {
+      showToast('Workbook needs at least one sheet', 'error');
+      return;
+    }
+    const sheet = getActiveSheet(currentWorkbook);
+    const confirmed = typeof window === 'undefined' || window.confirm(`Remove ${sheet.name}?`);
+    if (!confirmed) return;
+    commitWorkbookStructureCommand({type: CommandType.REMOVE_SHEET, sheetId: sheet.id, label: `Remove ${sheet.name}`}, `Removed ${sheet.name}`);
+  }, [commitWorkbookStructureCommand, showToast]);
   const copySelectionToClipboard = useCallback(() => {
     if (!navigator.clipboard?.writeText) {
       showToast('Clipboard blocked', 'error');
@@ -646,51 +707,61 @@ export function Spreadsheet({
       ) : null}
       {showToolbar ? <FunctionPicker open={formulaPickerOpen} activeAddress={activeAddress} formulaDraft={formulaDraft} selection={committedSelection} onPick={insertFunction} /> : null}
       <main className="stage">
-        <Card className="sheet-shell" padding={0}>
-          <div className="corner">✣</div>
-          <div className="column-header"><div className="header-layer" ref={headerLayerRef} style={{width: totalWidth, height: headerHeight}}>
-            {columns.map((col) => {
-              const inSelection = committedSelection && col >= committedSelection.c1 && col <= committedSelection.c2;
-              return <div key={col} className={`col-head-cell ${inSelection ? 'selected' : ''}`} style={{left: colMetrics.offset(col), width: colMetrics.size(col)}}>{columnName(col)}<span className="resize-col" onPointerDown={(e) => beginColResize(e, col)} /></div>;
-            })}
-          </div></div>
-          <div className="row-header"><div className="row-layer" ref={rowLayerRef} style={{height: totalHeight, width: sidebarWidth}}>
-            {renderedRows.map((row) => {
-              const inSelection = committedSelection && row >= committedSelection.r1 && row <= committedSelection.r2;
-              return <div key={row} className={`row-head-cell ${inSelection ? 'selected' : ''}`} style={{top: rowMetrics.offset(row), height: rowMetrics.size(row)}}>{row + 1}<span className="resize-row" onPointerDown={(e) => beginRowResize(e, row)} /></div>;
-            })}
-          </div></div>
-          <div className="viewport" ref={viewportRef} onScroll={onScroll} onContextMenu={onViewportContextMenu} tabIndex={0}>
-            <div className="spacer" style={{width: totalWidth, height: totalHeight}}>
-              <div className="cell-layer" style={{width: totalWidth, height: totalHeight}}>
-                {renderedRows.map((row) => (
-                  <RowFragment
-                    key={row}
-                    row={row}
-                    y={rowMetrics.offset(row)}
-                    height={rowMetrics.size(row)}
-                    columns={columns}
-                    colMetrics={colMetrics}
-                    registerRow={registerRow}
-                    registerCell={registerCell}
-                    activeCell={activeCell}
-                    workbook={workbook}
-                    sheetId={activeSheet.id}
-                    dataRef={cellDataRef}
-                    dataVersion={dataVersion}
-                    getDefaultCellValue={getDefaultCellValue}
-                    onPointerDown={onCellPointerDown}
-                    onContextMenu={openContextMenu}
-                    onDoubleClick={(e, r, c) => { e.preventDefault(); selectCell(r, c); openEditor(r, c); }}
-                  />
-                ))}
+        <div className="sheet-workbench">
+          <Card className="sheet-shell" padding={0}>
+            <div className="corner">✣</div>
+            <div className="column-header"><div className="header-layer" ref={headerLayerRef} style={{width: totalWidth, height: headerHeight}}>
+              {columns.map((col) => {
+                const inSelection = committedSelection && col >= committedSelection.c1 && col <= committedSelection.c2;
+                return <div key={col} className={`col-head-cell ${inSelection ? 'selected' : ''}`} style={{left: colMetrics.offset(col), width: colMetrics.size(col)}}>{columnName(col)}<span className="resize-col" onPointerDown={(e) => beginColResize(e, col)} /></div>;
+              })}
+            </div></div>
+            <div className="row-header"><div className="row-layer" ref={rowLayerRef} style={{height: totalHeight, width: sidebarWidth}}>
+              {renderedRows.map((row) => {
+                const inSelection = committedSelection && row >= committedSelection.r1 && row <= committedSelection.r2;
+                return <div key={row} className={`row-head-cell ${inSelection ? 'selected' : ''}`} style={{top: rowMetrics.offset(row), height: rowMetrics.size(row)}}>{row + 1}<span className="resize-row" onPointerDown={(e) => beginRowResize(e, row)} /></div>;
+              })}
+            </div></div>
+            <div className="viewport" ref={viewportRef} onScroll={onScroll} onContextMenu={onViewportContextMenu} tabIndex={0}>
+              <div className="spacer" style={{width: totalWidth, height: totalHeight}}>
+                <div className="cell-layer" style={{width: totalWidth, height: totalHeight}}>
+                  {renderedRows.map((row) => (
+                    <RowFragment
+                      key={row}
+                      row={row}
+                      y={rowMetrics.offset(row)}
+                      height={rowMetrics.size(row)}
+                      columns={columns}
+                      colMetrics={colMetrics}
+                      registerRow={registerRow}
+                      registerCell={registerCell}
+                      activeCell={activeCell}
+                      workbook={workbook}
+                      sheetId={activeSheet.id}
+                      dataRef={cellDataRef}
+                      dataVersion={dataVersion}
+                      getDefaultCellValue={getDefaultCellValue}
+                      onPointerDown={onCellPointerDown}
+                      onContextMenu={openContextMenu}
+                      onDoubleClick={(e, r, c) => { e.preventDefault(); selectCell(r, c); openEditor(r, c); }}
+                    />
+                  ))}
+                </div>
+                <div ref={selectionOverlayRef} className="selection-overlay"><div className="fill-handle" /></div>
+                {editor && <input ref={editorRef} className="cell-input" style={editorStyle} value={editor.value} onChange={(e) => setEditor((ed) => ({...ed, value: e.target.value}))} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') commitEditor(e.currentTarget.value); if (e.key === 'Escape') setEditor(null); }} onBlur={(e) => commitEditor(e.currentTarget.value)} />}
               </div>
-              <div ref={selectionOverlayRef} className="selection-overlay"><div className="fill-handle" /></div>
-              {editor && <input ref={editorRef} className="cell-input" style={editorStyle} value={editor.value} onChange={(e) => setEditor((ed) => ({...ed, value: e.target.value}))} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') commitEditor(e.currentTarget.value); if (e.key === 'Escape') setEditor(null); }} onBlur={(e) => commitEditor(e.currentTarget.value)} />}
             </div>
-          </div>
-          <div ref={resizeGuideRef} className="resize-guide col" />
-        </Card>
+            <div ref={resizeGuideRef} className="resize-guide col" />
+          </Card>
+          <SheetTabs
+            workbook={workbook}
+            activeSheetId={activeSheet.id}
+            onActivateSheet={activateSheet}
+            onAddSheet={addSheet}
+            onRenameActiveSheet={renameActiveSheet}
+            onRemoveActiveSheet={removeActiveSheet}
+          />
+        </div>
         {showInspector && (
           <InspectorPanel
             gridConfig={gridConfig}

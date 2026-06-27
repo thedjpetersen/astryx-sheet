@@ -23,6 +23,7 @@ export const CommandType = {
   CLEAR_VALIDATION: 'CLEAR_VALIDATION',
   RESIZE_ROW: 'RESIZE_ROW',
   RESIZE_COLUMN: 'RESIZE_COLUMN',
+  SET_ACTIVE_SHEET: 'SET_ACTIVE_SHEET',
   ADD_SHEET: 'ADD_SHEET',
   REMOVE_SHEET: 'REMOVE_SHEET',
   RENAME_SHEET: 'RENAME_SHEET',
@@ -312,7 +313,12 @@ function applyResizeDimension(workbook, command, kind) {
 }
 
 function applyAddSheet(workbook, command) {
-  const sheet = createSheet(command.sheet || {});
+  const requestedSheet = command.sheet || {};
+  let sheet = createSheet(requestedSheet);
+  if (workbook.sheets.has(sheet.id) && requestedSheet.id) throw new Error(`Sheet already exists: ${sheet.id}`);
+  while (workbook.sheets.has(sheet.id)) {
+    sheet = createSheet({...requestedSheet, id: undefined});
+  }
   const nextWorkbook = cloneWorkbook(workbook);
   nextWorkbook.sheets.set(sheet.id, sheet);
   nextWorkbook.sheetOrder.push(sheet.id);
@@ -321,7 +327,20 @@ function applyAddSheet(workbook, command) {
   nextWorkbook.version = workbook.version + 1;
   return {
     workbook: nextWorkbook,
-    inverse: {type: CommandType.REMOVE_SHEET, sheetId: sheet.id},
+    command: {...command, sheet},
+    inverse: {type: CommandType.REMOVE_SHEET, sheetId: sheet.id, nextActiveSheetId: workbook.activeSheetId},
+  };
+}
+
+function applySetActiveSheet(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  getSheet(workbook, sheetId);
+  const nextWorkbook = cloneWorkbook(workbook);
+  nextWorkbook.activeSheetId = sheetId;
+  nextWorkbook.version = workbook.version + 1;
+  return {
+    workbook: nextWorkbook,
+    inverse: {type: CommandType.SET_ACTIVE_SHEET, sheetId: workbook.activeSheetId},
   };
 }
 
@@ -332,7 +351,11 @@ function applyRemoveSheet(workbook, command) {
   const nextWorkbook = cloneWorkbook(workbook);
   nextWorkbook.sheets.delete(sheetId);
   nextWorkbook.sheetOrder = workbook.sheetOrder.filter((id) => id !== sheetId);
-  if (nextWorkbook.activeSheetId === sheetId) nextWorkbook.activeSheetId = nextWorkbook.sheetOrder[0];
+  if (nextWorkbook.activeSheetId === sheetId) {
+    nextWorkbook.activeSheetId = command.nextActiveSheetId && nextWorkbook.sheets.has(command.nextActiveSheetId)
+      ? command.nextActiveSheetId
+      : nextWorkbook.sheetOrder[0];
+  }
   nextWorkbook.version = workbook.version + 1;
   return {
     workbook: nextWorkbook,
@@ -380,14 +403,17 @@ function applyRemoveNamedRange(workbook, command) {
 
 function applyBatch(workbook, command) {
   const inverses = [];
+  const commands = [];
   let nextWorkbook = workbook;
   for (const childCommand of command.commands || []) {
     const result = applyWorkbookCommand(nextWorkbook, childCommand);
     nextWorkbook = result.workbook;
     inverses.unshift(result.inverse);
+    commands.push(result.command || childCommand);
   }
   return {
     workbook: nextWorkbook,
+    command: {...command, commands},
     inverse: {type: CommandType.BATCH, commands: inverses, label: command.label},
   };
 }
@@ -408,6 +434,7 @@ export function applyWorkbookCommand(workbook, command) {
   if (command.type === CommandType.CLEAR_VALIDATION) return applyClearValidation(workbook, command);
   if (command.type === CommandType.RESIZE_ROW) return applyResizeDimension(workbook, command, 'row');
   if (command.type === CommandType.RESIZE_COLUMN) return applyResizeDimension(workbook, command, 'col');
+  if (command.type === CommandType.SET_ACTIVE_SHEET) return applySetActiveSheet(workbook, command);
   if (command.type === CommandType.ADD_SHEET) return applyAddSheet(workbook, command);
   if (command.type === CommandType.REMOVE_SHEET) return applyRemoveSheet(workbook, command);
   if (command.type === CommandType.RENAME_SHEET) return applyRenameSheet(workbook, command);
@@ -418,9 +445,10 @@ export function applyWorkbookCommand(workbook, command) {
 
 export function dispatchCommand(workbook, command) {
   const result = applyWorkbookCommand(workbook, command);
+  const committedCommand = result.command || command;
   return {
     ...result.workbook,
-    history: [...workbook.history, {command, inverse: result.inverse, label: command.label || command.type}],
+    history: [...workbook.history, {command: committedCommand, inverse: result.inverse, label: committedCommand.label || committedCommand.type}],
     future: [],
   };
 }
