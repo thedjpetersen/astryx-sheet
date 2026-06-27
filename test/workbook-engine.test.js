@@ -15,6 +15,7 @@ import {
   getCachedCellDisplayValue,
   getCellDisplayValue,
   getCellRawValue,
+  NumberFormatType,
   recalculateWorkbook,
   rangeToTsv,
   redo,
@@ -176,6 +177,31 @@ test('dispatch with recalculation updates dependent formula caches from command 
   assert.deepEqual(result.recalculated, ['0:1', '0:2']);
   assert.equal(getCachedCellDisplayValue(workbook.sheets.get('sheet-1'), 0, 2), '11');
   assert.equal(workbook.history.length, 2);
+});
+
+test('range format commands format display values and undo cleanly', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommandWithRecalculation(workbook, {
+    type: CommandType.SET_RANGE,
+    cells: [
+      {row: 0, col: 0, value: '12.5'},
+      {row: 0, col: 1, formula: '=A1*2'},
+    ],
+  }).workbook;
+
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_RANGE_FORMAT,
+    range: {r1: 0, c1: 0, r2: 0, c2: 1},
+    format: {type: NumberFormatType.CURRENCY, currency: 'USD', decimals: 2},
+  });
+
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 0, 0), '$12.50');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 0, 1), '$25.00');
+  assert.deepEqual(workbook.sheets.get('sheet-1').cells.get('0:0').format, {type: 'currency', currency: 'USD', decimals: 2});
+
+  workbook = undo(workbook);
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 0, 0), '12.5');
+  assert.equal(workbook.sheets.get('sheet-1').cells.get('0:0').format, undefined);
 });
 
 test('explicit blank cells can override generated defaults', () => {

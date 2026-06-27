@@ -1,6 +1,7 @@
 import {cellKey} from '../model/address.js';
 import {normalizeSelection} from '../model/selection.js';
 import {cloneCellRecord, normalizeCellRecord} from './cells.js';
+import {mergeCellFormat} from './formatting.js';
 import {cloneSheet, cloneWorkbook, createSheet, getSheet, setCellRecord, withClonedSheet} from './workbook.js';
 
 export const CommandType = {
@@ -8,6 +9,7 @@ export const CommandType = {
   SET_CELL: 'SET_CELL',
   SET_RANGE: 'SET_RANGE',
   CLEAR_RANGE: 'CLEAR_RANGE',
+  SET_RANGE_FORMAT: 'SET_RANGE_FORMAT',
   RESIZE_ROW: 'RESIZE_ROW',
   RESIZE_COLUMN: 'RESIZE_COLUMN',
   ADD_SHEET: 'ADD_SHEET',
@@ -105,6 +107,28 @@ function applyClearRange(workbook, command) {
   };
 }
 
+function applySetRangeFormat(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const oldCells = [];
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
+    for (const point of iterateRange(command.range)) {
+      const key = cellKey(point.row, point.col);
+      const oldCell = cloneCellRecord(sheet.cells.get(key));
+      oldCells.push({row: point.row, col: point.col, cell: oldCell});
+      const nextCell = normalizeCellRecord(oldCell || {value: ''}) || {value: ''};
+      nextCell.format = command.replace
+        ? command.format
+        : mergeCellFormat(nextCell.format, command.format);
+      if (!nextCell.format) delete nextCell.format;
+      sheet.cells.set(key, nextCell);
+    }
+  });
+  return {
+    workbook: nextWorkbook,
+    inverse: {type: CommandType.SET_RANGE, sheetId, cells: oldCells},
+  };
+}
+
 function applyResizeDimension(workbook, command, kind) {
   const sheetId = command.sheetId || workbook.activeSheetId;
   const mapName = kind === 'row' ? 'rowHeights' : 'colWidths';
@@ -181,6 +205,7 @@ export function applyWorkbookCommand(workbook, command) {
   if (command.type === CommandType.SET_CELL) return applySetCell(workbook, command);
   if (command.type === CommandType.SET_RANGE) return applySetRange(workbook, command);
   if (command.type === CommandType.CLEAR_RANGE) return applyClearRange(workbook, command);
+  if (command.type === CommandType.SET_RANGE_FORMAT) return applySetRangeFormat(workbook, command);
   if (command.type === CommandType.RESIZE_ROW) return applyResizeDimension(workbook, command, 'row');
   if (command.type === CommandType.RESIZE_COLUMN) return applyResizeDimension(workbook, command, 'col');
   if (command.type === CommandType.ADD_SHEET) return applyAddSheet(workbook, command);

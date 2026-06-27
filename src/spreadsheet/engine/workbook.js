@@ -3,6 +3,7 @@ import {DEFAULT_GRID_CONFIG} from '../model/constants.js';
 import {defaultCellValue} from '../model/defaultData.js';
 import {displayCellValue} from '../model/formulas.js';
 import {cellRecordToRaw, cellRecordToSerializable, cloneCellRecord, normalizeCellRecord} from './cells.js';
+import {formatValue} from './formatting.js';
 
 let nextWorkbookId = 1;
 let nextSheetId = 1;
@@ -140,12 +141,18 @@ export function createSheetDataRef(sheet) {
 
 export function getCellDisplayValue(workbook, sheetId, row, col, options = {}) {
   const sheet = getSheet(workbook, sheetId);
+  const record = getCellRecord(workbook, sheetId, row, col);
   const getDefaultCellValue = options.getDefaultCellValue || defaultCellValue;
   const raw = getCellRawValue(workbook, sheetId, row, col, {getDefaultCellValue});
-  if (typeof raw === 'string' && raw.trim().startsWith('=')) {
-    return displayCellValue(createSheetDataRef(sheet), row, col, getDefaultCellValue);
+  const format = record?.format;
+  if (record?.formula && 'computedValue' in record) {
+    return format ? formatValue(record.computedValue, format, options) : record.displayValue ?? String(record.computedValue ?? '');
   }
-  return raw;
+  if (typeof raw === 'string' && raw.trim().startsWith('=')) {
+    const evaluated = displayCellValue(createSheetDataRef(sheet), row, col, getDefaultCellValue);
+    return format ? formatValue(evaluated, format, options) : evaluated;
+  }
+  return format ? formatValue(raw, format, options) : raw;
 }
 
 export function serializeSheetForSnapshot(sheet) {
