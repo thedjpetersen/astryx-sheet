@@ -8,6 +8,7 @@ export {cloneFilter, createFilter, createFilterStore, getVisibleRowsForFilter, g
 export {NumberFormatType, formatValue, mergeCellFormat} from './formatting.js';
 export {assertNoMergeOverlap, cloneMergedRange, createMergeStore, createMergedRange, getMergeAtCell, listMergedRanges, mergeIdForRange, rangesIntersect} from './merges.js';
 export {cloneNamedRange, createNamedRange, createNamedRangeStore, expandNamedRangesInFormula, getNamedRange, listNamedRanges, normalizeName, rangeToFormulaReference} from './names.js';
+export {cloneValidationRule, createValidationRule, createValidationStore, getValidationRulesForCell, validateCellValue, validateValue, validationAppliesToCell, validationIdForRange} from './validation.js';
 export {deserializeWorkbook, serializeWorkbook} from './serialization.js';
 export {
   createCellStore,

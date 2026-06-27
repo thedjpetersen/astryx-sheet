@@ -5,6 +5,7 @@ import {cloneFilter, createFilter} from './filters.js';
 import {mergeCellFormat} from './formatting.js';
 import {assertNoMergeOverlap, cloneMergedRange, createMergedRange} from './merges.js';
 import {cloneNamedRange, createNamedRange, normalizeName} from './names.js';
+import {cloneValidationRule, createValidationRule} from './validation.js';
 import {cloneSheet, cloneWorkbook, createSheet, getSheet, setCellRecord, withClonedSheet} from './workbook.js';
 
 export const CommandType = {
@@ -18,6 +19,8 @@ export const CommandType = {
   CLEAR_FILTER: 'CLEAR_FILTER',
   MERGE_RANGE: 'MERGE_RANGE',
   UNMERGE_RANGE: 'UNMERGE_RANGE',
+  SET_VALIDATION: 'SET_VALIDATION',
+  CLEAR_VALIDATION: 'CLEAR_VALIDATION',
   RESIZE_ROW: 'RESIZE_ROW',
   RESIZE_COLUMN: 'RESIZE_COLUMN',
   ADD_SHEET: 'ADD_SHEET',
@@ -265,6 +268,34 @@ function applyUnmergeRange(workbook, command) {
   };
 }
 
+function applySetValidation(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const rule = createValidationRule(command.rule || {...command, type: command.validationType || command.ruleType || 'any'});
+  const oldRule = cloneValidationRule(getSheet(workbook, sheetId).validations.get(rule.id));
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
+    sheet.validations.set(rule.id, rule);
+  });
+  return {
+    workbook: nextWorkbook,
+    inverse: oldRule
+      ? {type: CommandType.SET_VALIDATION, sheetId, rule: oldRule}
+      : {type: CommandType.CLEAR_VALIDATION, sheetId, id: rule.id},
+  };
+}
+
+function applyClearValidation(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const id = command.id || (command.range ? createValidationRule(command).id : undefined);
+  const oldRule = cloneValidationRule(getSheet(workbook, sheetId).validations.get(id));
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
+    sheet.validations.delete(id);
+  });
+  return {
+    workbook: nextWorkbook,
+    inverse: oldRule ? {type: CommandType.SET_VALIDATION, sheetId, rule: oldRule} : {type: CommandType.CLEAR_VALIDATION, sheetId, id},
+  };
+}
+
 function applyResizeDimension(workbook, command, kind) {
   const sheetId = command.sheetId || workbook.activeSheetId;
   const mapName = kind === 'row' ? 'rowHeights' : 'colWidths';
@@ -373,6 +404,8 @@ export function applyWorkbookCommand(workbook, command) {
   if (command.type === CommandType.CLEAR_FILTER) return applyClearFilter(workbook, command);
   if (command.type === CommandType.MERGE_RANGE) return applyMergeRange(workbook, command);
   if (command.type === CommandType.UNMERGE_RANGE) return applyUnmergeRange(workbook, command);
+  if (command.type === CommandType.SET_VALIDATION) return applySetValidation(workbook, command);
+  if (command.type === CommandType.CLEAR_VALIDATION) return applyClearValidation(workbook, command);
   if (command.type === CommandType.RESIZE_ROW) return applyResizeDimension(workbook, command, 'row');
   if (command.type === CommandType.RESIZE_COLUMN) return applyResizeDimension(workbook, command, 'col');
   if (command.type === CommandType.ADD_SHEET) return applyAddSheet(workbook, command);

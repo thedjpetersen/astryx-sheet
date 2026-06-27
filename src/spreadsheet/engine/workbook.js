@@ -7,6 +7,7 @@ import {cloneFilter, createFilterStore} from './filters.js';
 import {formatValue} from './formatting.js';
 import {cloneMergedRange, createMergeStore} from './merges.js';
 import {cloneNamedRange, createNamedRangeStore} from './names.js';
+import {cloneValidationRule, createValidationStore} from './validation.js';
 
 let nextWorkbookId = 1;
 let nextSheetId = 1;
@@ -52,6 +53,7 @@ export function createSheet(input = {}) {
     colWidths: createDimensionStore(input.colWidths),
     filters: createFilterStore(input.filters),
     merges: createMergeStore(input.merges),
+    validations: createValidationStore(input.validations),
     metadata: input.metadata ? {...input.metadata} : {},
   };
 }
@@ -64,6 +66,7 @@ export function cloneSheet(sheet) {
     colWidths: new Map(sheet.colWidths),
     filters: new Map(Array.from(sheet.filters.entries(), ([id, filter]) => [id, cloneFilter(filter)])),
     merges: new Map(Array.from(sheet.merges.entries(), ([id, merge]) => [id, cloneMergedRange(merge)])),
+    validations: new Map(Array.from(sheet.validations.entries(), ([id, rule]) => [id, cloneValidationRule(rule)])),
     metadata: {...sheet.metadata},
   };
 }
@@ -177,6 +180,7 @@ export function serializeSheetForSnapshot(sheet) {
     colWidths: Array.from(sheet.colWidths.entries()),
     filters: Array.from(sheet.filters.values()).map(cloneFilter),
     merges: Array.from(sheet.merges.values()).map(cloneMergedRange),
+    validations: Array.from(sheet.validations.values()).map(cloneValidationRule),
     metadata: {...sheet.metadata},
   };
 }

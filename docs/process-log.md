@@ -28,6 +28,7 @@
 - Added sheet filter state, criteria evaluation, visible-row selectors, command history, and snapshot serialization.
 - Connected filter state to the React toolbar, virtualized row metrics, and inspector metrics.
 - Added merged range metadata with overlap validation, command history, selectors, and snapshot serialization.
+- Added data validation rules with command history, selectors, predicate evaluation, and snapshot serialization.
 
 ## Current Direction
 
@@ -36,4 +37,4 @@ The package should grow around two public layers:
 - A workbook engine that can run without React and eventually own Excel-scale state, formulas, commands, history, import/export, and collaboration hooks.
 - A virtualized React grid that consumes the engine and can be embedded with or without the Astryx toolbar and themes.
 
-The next implementation pass should connect merged range metadata to the React renderer and add richer paste semantics for formatting-oriented external clipboard payloads and larger ranges.
+The next implementation pass should connect merged range and validation metadata to the React renderer and add richer paste semantics for formatting-oriented external clipboard payloads and larger ranges.

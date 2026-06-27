@@ -30,6 +30,7 @@ import {
   redo,
   serializeWorkbook,
   undo,
+  validateCellValue,
 } from '../src/spreadsheet/engine/index.js';
 
 test('workbook commands update sparse cells and evaluate formulas', () => {
@@ -304,6 +305,32 @@ test('merged ranges are validated, undoable, and serialized', () => {
 
   workbook = undo(workbook);
   assert.equal(getMergeAtCell(workbook.sheets.get('sheet-1'), 1, 1), null);
+});
+
+test('validation rules evaluate cells and restore with undo', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_VALIDATION,
+    rule: {
+      range: {r1: 1, c1: 1, r2: 3, c2: 1},
+      type: 'number',
+      operator: 'between',
+      min: 10,
+      max: 20,
+      message: 'Enter a score from 10 to 20',
+    },
+  });
+
+  assert.equal(validateCellValue(workbook.sheets.get('sheet-1'), 1, 1, '15').valid, true);
+  const invalid = validateCellValue(workbook.sheets.get('sheet-1'), 1, 1, '25');
+  assert.equal(invalid.valid, false);
+  assert.equal(invalid.failures[0].message, 'Enter a score from 10 to 20');
+
+  const restored = deserializeWorkbook(serializeWorkbook(workbook));
+  assert.equal(validateCellValue(restored.sheets.get('sheet-1'), 1, 1, '25').valid, false);
+
+  workbook = undo(workbook);
+  assert.equal(validateCellValue(workbook.sheets.get('sheet-1'), 1, 1, '25').valid, true);
 });
 
 test('named ranges are undoable and survive snapshots', () => {
