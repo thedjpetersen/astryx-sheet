@@ -52,6 +52,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Demo options for theme selection (default: Neutral), dark mode, inspector visibility, compact row density, and high-contrast selection
 - Embeddable source package exports for the React `Spreadsheet` component and a React-independent workbook engine
 - `onWorkbookChange` callback for host applications that need workbook state after cell, sheet, history, format, filter, sort, clipboard, or resize commands
+- Headless `createWorkbookController` API for non-React command dispatch, subscriptions, history, recalculation, and snapshots
 - Workbook engine primitives for sparse sheets, active-sheet state, cells, formulas, commands, undo/redo, TSV clipboard data, and JSON snapshots
 
 ## Why this exists
@@ -104,7 +105,7 @@ src/index.js                    # package exports for embedding
 src/app/                        # demo app + Astryx theme registry
 src/spreadsheet/Spreadsheet.jsx # embeddable spreadsheet component
 src/spreadsheet/components/     # toolbar, cells, menus, inspector, picker
-src/spreadsheet/engine/         # workbook core, commands, undo/redo, clipboard
+src/spreadsheet/engine/         # workbook core, controller, commands, undo/redo, clipboard
 src/spreadsheet/model/          # addresses, formulas, dimensions, selections
 src/hooks/                      # reusable React runtime hooks
 test/                           # engine behavior tests runnable with node:test

@@ -7,6 +7,7 @@ import {
   createImportDelimitedCommand,
   createPasteTsvCommand,
   createWorkbook,
+  createWorkbookController,
   deserializeWorkbook,
   dispatchCommand,
   dispatchCommandWithRecalculation,
@@ -61,6 +62,60 @@ test('undo and redo restore previous workbook state', () => {
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 1), 'Changed');
   workbook = redo(workbook);
   assert.equal(workbook.sheets.get('sheet-1').colWidths.get(1), 180);
+});
+
+test('workbook controller dispatches commands and notifies subscribers', () => {
+  const controller = createWorkbookController({sheets: [{id: 'sheet-1'}]});
+  const events = [];
+  const unsubscribe = controller.subscribe((event) => events.push(event));
+
+  const result = controller.dispatch({type: CommandType.SET_CELL, row: 0, col: 0, value: '42'});
+
+  assert.equal(getCellRawValue(controller.getWorkbook(), 'sheet-1', 0, 0), '42');
+  assert.equal(result.workbook, controller.getWorkbook());
+  assert.equal(events.length, 1);
+  assert.equal(events[0].source, 'command');
+  assert.equal(events[0].command.type, CommandType.SET_CELL);
+  assert.equal(events[0].activeSheetId, 'sheet-1');
+
+  controller.dispatch({type: CommandType.ADD_SHEET, sheet: {name: 'Generated'}});
+  assert.equal(events.length, 2);
+  assert.equal(events[1].command.type, CommandType.ADD_SHEET);
+  assert.equal(typeof events[1].command.sheet.id, 'string');
+  assert.equal(controller.getActiveSheet().name, 'Generated');
+
+  unsubscribe();
+  controller.dispatch({type: CommandType.SET_CELL, row: 0, col: 1, value: 'ignored event'});
+  assert.equal(events.length, 2);
+});
+
+test('workbook controller handles history, snapshots, and formula recalculation', () => {
+  const controller = createWorkbookController({sheets: [{id: 'sheet-1'}]});
+  const events = [];
+  controller.subscribe((event) => events.push(event), {emitCurrent: true});
+
+  controller.dispatch({
+    type: CommandType.SET_RANGE,
+    cells: [
+      {row: 0, col: 0, value: '2'},
+      {row: 0, col: 1, formula: '=A1+1'},
+    ],
+  });
+  assert.equal(getCachedCellDisplayValue(controller.getActiveSheet(), 0, 1), '3');
+
+  controller.dispatch({type: CommandType.SET_CELL, row: 0, col: 0, value: '4'});
+  assert.equal(getCachedCellDisplayValue(controller.getActiveSheet(), 0, 1), '5');
+
+  controller.undo();
+  assert.equal(getCachedCellDisplayValue(controller.getActiveSheet(), 0, 1), '3');
+  controller.redo();
+  assert.equal(getCachedCellDisplayValue(controller.getActiveSheet(), 0, 1), '5');
+
+  const snapshot = controller.serialize();
+  const restoredController = createWorkbookController(snapshot);
+  assert.equal(getCachedCellDisplayValue(restoredController.getActiveSheet(), 0, 1), '5');
+  assert.equal(events[0].source, 'subscribe');
+  assert.equal(events.some((event) => event.source === 'history' && event.action === 'undo'), true);
 });
 
 test('batch commands undo and redo as one history entry', () => {
