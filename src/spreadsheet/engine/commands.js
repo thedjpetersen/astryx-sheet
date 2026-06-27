@@ -1,0 +1,174 @@
+import {cellKey} from '../model/address.js';
+import {normalizeSelection} from '../model/selection.js';
+import {cloneCellRecord, normalizeCellRecord} from './cells.js';
+import {cloneSheet, cloneWorkbook, createSheet, getSheet, setCellRecord, withClonedSheet} from './workbook.js';
+
+export const CommandType = {
+  SET_CELL: 'SET_CELL',
+  SET_RANGE: 'SET_RANGE',
+  CLEAR_RANGE: 'CLEAR_RANGE',
+  RESIZE_ROW: 'RESIZE_ROW',
+  RESIZE_COLUMN: 'RESIZE_COLUMN',
+  ADD_SHEET: 'ADD_SHEET',
+  REMOVE_SHEET: 'REMOVE_SHEET',
+  RENAME_SHEET: 'RENAME_SHEET',
+};
+
+function normalizeCommandCell(command) {
+  if ('cell' in command) return normalizeCellRecord(command.cell);
+  if ('formula' in command) return normalizeCellRecord({formula: command.formula, value: command.value});
+  return normalizeCellRecord(command.value);
+}
+
+function* iterateRange(range) {
+  const normalized = 'row' in range
+    ? normalizeSelection({row: range.row, col: range.col}, {row: range.row, col: range.col})
+    : range;
+  for (let row = normalized.r1; row <= normalized.r2; row++) {
+    for (let col = normalized.c1; col <= normalized.c2; col++) {
+      yield {row, col};
+    }
+  }
+}
+
+function applySetCell(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const oldCell = cloneCellRecord(getSheet(workbook, sheetId).cells.get(cellKey(command.row, command.col)));
+  const nextCell = normalizeCommandCell(command);
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => setCellRecord(sheet, command.row, command.col, nextCell));
+  return {
+    workbook: nextWorkbook,
+    inverse: {type: CommandType.SET_CELL, sheetId, row: command.row, col: command.col, cell: oldCell},
+  };
+}
+
+function applySetRange(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const oldCells = [];
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
+    for (const item of command.cells || []) {
+      oldCells.push({row: item.row, col: item.col, cell: cloneCellRecord(sheet.cells.get(cellKey(item.row, item.col)))});
+      const nextCell = 'cell' in item ? item.cell : 'formula' in item ? {formula: item.formula, value: item.value} : item.value;
+      setCellRecord(sheet, item.row, item.col, nextCell);
+    }
+  });
+  return {
+    workbook: nextWorkbook,
+    inverse: {type: CommandType.SET_RANGE, sheetId, cells: oldCells},
+  };
+}
+
+function applyClearRange(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const oldCells = [];
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
+    for (const point of iterateRange(command.range)) {
+      oldCells.push({row: point.row, col: point.col, cell: cloneCellRecord(sheet.cells.get(cellKey(point.row, point.col)))});
+      sheet.cells.delete(cellKey(point.row, point.col));
+    }
+  });
+  return {
+    workbook: nextWorkbook,
+    inverse: {type: CommandType.SET_RANGE, sheetId, cells: oldCells},
+  };
+}
+
+function applyResizeDimension(workbook, command, kind) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const mapName = kind === 'row' ? 'rowHeights' : 'colWidths';
+  const indexName = kind === 'row' ? 'row' : 'col';
+  const oldValue = getSheet(workbook, sheetId)[mapName].has(command[indexName]) ? getSheet(workbook, sheetId)[mapName].get(command[indexName]) : null;
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
+    if (command.size == null) sheet[mapName].delete(command[indexName]);
+    else sheet[mapName].set(command[indexName], command.size);
+  });
+  return {
+    workbook: nextWorkbook,
+    inverse: {type: command.type, sheetId, [indexName]: command[indexName], size: oldValue},
+  };
+}
+
+function applyAddSheet(workbook, command) {
+  const sheet = createSheet(command.sheet || {});
+  const nextWorkbook = cloneWorkbook(workbook);
+  nextWorkbook.sheets.set(sheet.id, sheet);
+  nextWorkbook.sheetOrder.push(sheet.id);
+  nextWorkbook.activeSheetId = command.activate === false ? workbook.activeSheetId : sheet.id;
+  nextWorkbook.future = [...workbook.future];
+  nextWorkbook.version = workbook.version + 1;
+  return {
+    workbook: nextWorkbook,
+    inverse: {type: CommandType.REMOVE_SHEET, sheetId: sheet.id},
+  };
+}
+
+function applyRemoveSheet(workbook, command) {
+  if (workbook.sheetOrder.length <= 1) throw new Error('Cannot remove the final sheet');
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const removedSheet = cloneSheet(getSheet(workbook, sheetId));
+  const nextWorkbook = cloneWorkbook(workbook);
+  nextWorkbook.sheets.delete(sheetId);
+  nextWorkbook.sheetOrder = workbook.sheetOrder.filter((id) => id !== sheetId);
+  if (nextWorkbook.activeSheetId === sheetId) nextWorkbook.activeSheetId = nextWorkbook.sheetOrder[0];
+  nextWorkbook.version = workbook.version + 1;
+  return {
+    workbook: nextWorkbook,
+    inverse: {type: CommandType.ADD_SHEET, sheet: removedSheet, activate: workbook.activeSheetId === sheetId},
+  };
+}
+
+function applyRenameSheet(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const oldName = getSheet(workbook, sheetId).name;
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
+    sheet.name = command.name || oldName;
+  });
+  return {
+    workbook: nextWorkbook,
+    inverse: {type: CommandType.RENAME_SHEET, sheetId, name: oldName},
+  };
+}
+
+export function applyWorkbookCommand(workbook, command) {
+  if (!command?.type) throw new Error('Workbook command requires a type');
+  if (command.type === CommandType.SET_CELL) return applySetCell(workbook, command);
+  if (command.type === CommandType.SET_RANGE) return applySetRange(workbook, command);
+  if (command.type === CommandType.CLEAR_RANGE) return applyClearRange(workbook, command);
+  if (command.type === CommandType.RESIZE_ROW) return applyResizeDimension(workbook, command, 'row');
+  if (command.type === CommandType.RESIZE_COLUMN) return applyResizeDimension(workbook, command, 'col');
+  if (command.type === CommandType.ADD_SHEET) return applyAddSheet(workbook, command);
+  if (command.type === CommandType.REMOVE_SHEET) return applyRemoveSheet(workbook, command);
+  if (command.type === CommandType.RENAME_SHEET) return applyRenameSheet(workbook, command);
+  throw new Error(`Unknown workbook command: ${command.type}`);
+}
+
+export function dispatchCommand(workbook, command) {
+  const result = applyWorkbookCommand(workbook, command);
+  return {
+    ...result.workbook,
+    history: [...workbook.history, {command, inverse: result.inverse, label: command.label || command.type}],
+    future: [],
+  };
+}
+
+export function undo(workbook) {
+  const entry = workbook.history[workbook.history.length - 1];
+  if (!entry) return workbook;
+  const result = applyWorkbookCommand(workbook, entry.inverse);
+  return {
+    ...result.workbook,
+    history: workbook.history.slice(0, -1),
+    future: [entry, ...workbook.future],
+  };
+}
+
+export function redo(workbook) {
+  const entry = workbook.future[0];
+  if (!entry) return workbook;
+  const result = applyWorkbookCommand(workbook, entry.command);
+  return {
+    ...result.workbook,
+    history: [...workbook.history, entry],
+    future: workbook.future.slice(1),
+  };
+}

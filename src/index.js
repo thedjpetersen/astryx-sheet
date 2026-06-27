@@ -1,0 +1,10 @@
+export {AstryxSheetApp} from './app/AstryxSheetApp.jsx';
+export {THEMES, THEME_OPTIONS, getTheme, registerThemeIcons} from './app/themes.js';
+export {Spreadsheet} from './spreadsheet/Spreadsheet.jsx';
+export {DEFAULT_GRID_CONFIG} from './spreadsheet/model/constants.js';
+export {cellAddress, cellKey, columnName, parseCellAddress, parseRange} from './spreadsheet/model/address.js';
+export {defaultCellValue, createDefaultCellData, createDefaultRowHeights, createDefaultColWidths} from './spreadsheet/model/defaultData.js';
+export {displayCellValue, evaluateFormula, formatFormulaResult, readCell, toNumber} from './spreadsheet/model/formulas.js';
+export {makeDimensionHelpers} from './spreadsheet/model/dimensions.js';
+export {normalizeSelection} from './spreadsheet/model/selection.js';
+export * from './spreadsheet/engine/index.js';

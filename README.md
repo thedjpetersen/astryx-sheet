@@ -23,6 +23,8 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Right-click context menu for edit, clear, copy, resize, and sample formula actions
 - Live inspector panel showing mounted cells, sparse overrides, effect-registered geometry, and approximate FPS
 - Demo options for theme selection (default: Neutral), dark mode, inspector visibility, compact row density, and high-contrast selection
+- Embeddable source package exports for the React `Spreadsheet` component and a React-independent workbook engine
+- Workbook engine primitives for sparse sheets, cells, formulas, commands, undo/redo, TSV clipboard data, and JSON snapshots
 
 ## Why this exists
 
@@ -60,6 +62,7 @@ Then open the Vite URL printed in your terminal.
 
 ```bash
 npm run dev      # start local development
+npm test         # run React-independent workbook engine tests
 npm run build    # production build
 npm run build && rm -rf docs && cp -R dist docs  # refresh GitHub Pages demo
 npm run preview  # preview the production build
@@ -68,14 +71,24 @@ npm run preview  # preview the production build
 ## Project structure
 
 ```text
-src/main.jsx     # full spreadsheet prototype
-index.html       # Vite entry point
-package.json     # scripts and dependencies
+src/main.jsx                    # Vite demo bootstrap
+src/index.js                    # package exports for embedding
+src/app/                        # demo app + Astryx theme registry
+src/spreadsheet/Spreadsheet.jsx # embeddable spreadsheet component
+src/spreadsheet/components/     # toolbar, cells, menus, inspector, picker
+src/spreadsheet/engine/         # workbook core, commands, undo/redo, clipboard
+src/spreadsheet/model/          # addresses, formulas, dimensions, selections
+src/hooks/                      # reusable React runtime hooks
+test/                           # engine behavior tests runnable with node:test
+index.html                      # Vite entry point
+package.json                    # scripts, dependencies, source exports
 ```
+
+See [docs/architecture.md](docs/architecture.md) for the current extension boundaries and the intended path toward a full workbook engine.
 
 ## Notes
 
-This is a prototype, not a full spreadsheet engine. The goal is to demonstrate UI architecture and performance patterns with Astryx, not complete Excel parity.
+This is still a staged implementation, not complete Excel parity. The current focus is a durable embeddable foundation: a performant virtualized React surface backed by a growing workbook engine that can eventually own Excel-scale behavior.
 
 ## License
 

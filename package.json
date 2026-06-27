@@ -4,10 +4,22 @@
   "private": false,
   "type": "module",
   "description": "An Astryx-powered virtual spreadsheet editor prototype with large-grid virtualization, formulas, selection, resizing, and ref-driven interaction loops.",
+  "main": "./src/index.js",
+  "module": "./src/index.js",
+  "exports": {
+    ".": {
+      "import": "./src/index.js"
+    },
+    "./styles.css": "./src/styles.css"
+  },
+  "sideEffects": [
+    "./src/styles.css"
+  ],
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --test"
   },
   "keywords": [
     "astryx",
