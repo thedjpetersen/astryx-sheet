@@ -11,7 +11,7 @@ import {InspectorPanel} from './components/InspectorPanel.jsx';
 import {NativeContextMenu} from './components/NativeContextMenu.jsx';
 import {RowFragment} from './components/RowFragment.jsx';
 import {SpreadsheetToolbar} from './components/SpreadsheetToolbar.jsx';
-import {CommandType, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, getActiveSheet, rangeToTsv, redo as redoWorkbook, undo as undoWorkbook} from './engine/index.js';
+import {CommandType, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook} from './engine/index.js';
 import {cellAddress, cellKey, columnName} from './model/address.js';
 import {DEFAULT_GRID_CONFIG} from './model/constants.js';
 import {createDefaultCellData, createDefaultColWidths, createDefaultRowHeights, defaultCellValue} from './model/defaultData.js';
@@ -153,15 +153,16 @@ export function Spreadsheet({
   }, [activeCell, getDefaultCellValue]);
   const navigateHistory = useCallback((navigate, label) => {
     const currentWorkbook = workbookRef.current;
-    const nextWorkbook = navigate(currentWorkbook);
-    if (nextWorkbook === currentWorkbook) return;
+    const navigatedWorkbook = navigate(currentWorkbook);
+    if (navigatedWorkbook === currentWorkbook) return;
+    const nextWorkbook = recalculateWorkbook(navigatedWorkbook, {getDefaultCellValue}).workbook;
     workbookRef.current = nextWorkbook;
     setWorkbook(nextWorkbook);
     setDataVersion((v) => v + 1);
     setDimensionVersion((v) => v + 1);
     syncFormulaDraftFromWorkbook(nextWorkbook);
     showToast(label);
-  }, [showToast, syncFormulaDraftFromWorkbook]);
+  }, [getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook]);
   const undoLastCommand = useCallback(() => navigateHistory(undoWorkbook, 'Undo'), [navigateHistory]);
   const redoLastCommand = useCallback(() => navigateHistory(redoWorkbook, 'Redo'), [navigateHistory]);
   const copySelectionToClipboard = useCallback(() => {
@@ -183,14 +184,15 @@ export function Spreadsheet({
     }
     navigator.clipboard.readText().then((text) => {
       if (!text) return;
-      const nextWorkbook = dispatchCommand(workbookRef.current, createPasteTsvCommand(text, activeCell));
+      const result = dispatchCommandWithRecalculation(workbookRef.current, createPasteTsvCommand(text, activeCell), {getDefaultCellValue});
+      const nextWorkbook = result.workbook;
       workbookRef.current = nextWorkbook;
       setWorkbook(nextWorkbook);
       setDataVersion((v) => v + 1);
       syncFormulaDraftFromWorkbook(nextWorkbook);
       showToast('Pasted cells');
     }, () => showToast('Clipboard blocked', 'error'));
-  }, [activeCell, showToast, syncFormulaDraftFromWorkbook]);
+  }, [activeCell, getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook]);
   const setActiveCell = useCallback((point) => {
     const nextPoint = clampPoint(point, gridConfig);
     setActiveCellState(nextPoint);
@@ -203,9 +205,10 @@ export function Spreadsheet({
   const setCell = useCallback((row, col, value) => {
     const nextCell = value === getDefaultCellValue(row, col) ? null : value;
     setWorkbook((currentWorkbook) => {
-      const nextWorkbook = dispatchCommand(currentWorkbook, {type: CommandType.SET_CELL, row, col, cell: nextCell});
+      const result = dispatchCommandWithRecalculation(currentWorkbook, {type: CommandType.SET_CELL, row, col, cell: nextCell}, {getDefaultCellValue});
+      const nextWorkbook = result.workbook;
       workbookRef.current = nextWorkbook;
-      onCellChange?.({row, col, address: cellAddress(row, col), value, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
+      onCellChange?.({row, col, address: cellAddress(row, col), value, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook, recalculated: result.recalculated});
       return nextWorkbook;
     });
     setDataVersion((v) => v + 1);
@@ -272,15 +275,16 @@ export function Spreadsheet({
     const cells = [];
     for (let r = selection.r1; r <= selection.r2; r++) for (let c = selection.c1; c <= selection.c2; c++) cells.push({row: r, col: c, cell: {value: ''}});
     setWorkbook((currentWorkbook) => {
-      const nextWorkbook = dispatchCommand(currentWorkbook, {type: CommandType.SET_RANGE, cells});
+      const result = dispatchCommandWithRecalculation(currentWorkbook, {type: CommandType.SET_RANGE, cells}, {getDefaultCellValue});
+      const nextWorkbook = result.workbook;
       workbookRef.current = nextWorkbook;
-      onCellChange?.({selection, value: '', cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
+      onCellChange?.({selection, value: '', cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook, recalculated: result.recalculated});
       return nextWorkbook;
     });
     setDataVersion((v) => v + 1);
     if (activeCell.row >= selection.r1 && activeCell.row <= selection.r2 && activeCell.col >= selection.c1 && activeCell.col <= selection.c2) setFormulaDraft('');
     showToast(`Cleared ${count.toLocaleString()} cell${count === 1 ? '' : 's'}`);
-  }, [committedSelection, activeCell, showToast, onCellChange]);
+  }, [committedSelection, activeCell, getDefaultCellValue, showToast, onCellChange]);
   const resizeColumn = useCallback((col, size) => {
     setWorkbook((currentWorkbook) => {
       const nextWorkbook = dispatchCommand(currentWorkbook, {type: CommandType.RESIZE_COLUMN, col, size});
