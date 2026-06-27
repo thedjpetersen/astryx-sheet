@@ -52,6 +52,13 @@ test('range clear and TSV paste are command-compatible', () => {
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 0), 'Ada');
 });
 
+test('explicit blank cells can override generated defaults', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, {type: CommandType.SET_CELL, row: 0, col: 0, value: ''});
+
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 0, 0, {getDefaultCellValue: () => 'Generated'}), '');
+});
+
 test('workbook snapshots round-trip sheet and cell data', () => {
   let workbook = createWorkbook({sheets: [{id: 'sheet-1', name: 'Inputs'}]});
   workbook = dispatchCommand(workbook, {type: CommandType.SET_CELL, row: 2, col: 3, value: 'Persisted'});

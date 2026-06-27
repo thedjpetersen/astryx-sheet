@@ -8,7 +8,7 @@ export function cloneCellRecord(cell) {
 }
 
 export function normalizeCellRecord(input) {
-  if (input == null || input === '') return null;
+  if (input == null) return null;
   if (typeof input === 'object' && !Array.isArray(input)) {
     const record = {};
     if (input.formula != null && input.formula !== '') {

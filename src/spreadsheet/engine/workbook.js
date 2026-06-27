@@ -133,6 +133,7 @@ export function createSheetDataRef(sheet) {
     current: {
       has: (key) => sheet.cells.has(key),
       get: (key) => cellRecordToRaw(sheet.cells.get(key)),
+      get size() { return sheet.cells.size; },
     },
   };
 }
