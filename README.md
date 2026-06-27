@@ -47,7 +47,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - React edit, clear, and paste flows enforce host-provided validation rules and mark invalid visible cells
 - React toolbar actions for adding number/list validation rules and clearing active validation rules
 - Inspector metrics for merged ranges, validation rules, and named ranges
-- Formula evaluation for `SUM`, `AVERAGE` / `AVG`, `MIN`, `MAX`, `COUNT`, `CONCAT`, cell references, ranges, and basic arithmetic
+- Formula evaluation for aggregates, `IF`, logical predicates, scalar math, text helpers, cell references, ranges, comparisons, and basic arithmetic
 - Right-click context menu for edit, clear, copy, resize, and sample formula actions
 - Live inspector panel showing mounted cells, sparse overrides, effect-registered geometry, and approximate FPS
 - Demo options for theme selection (default: Neutral), dark mode, inspector visibility, compact row density, and high-contrast selection

@@ -376,6 +376,32 @@ test('dispatch with recalculation updates dependent formula caches from command 
   assert.equal(workbook.history.length, 2);
 });
 
+test('formula evaluator supports logical, text, and scalar functions', () => {
+  const result = dispatchCommandWithRecalculation(createWorkbook({sheets: [{id: 'sheet-1'}]}), {
+    type: CommandType.SET_RANGE,
+    cells: [
+      {row: 0, col: 0, value: '12'},
+      {row: 0, col: 1, value: '  ada  lovelace  '},
+      {row: 0, col: 2, formula: '=IF(A1>=10,"ok","no")'},
+      {row: 0, col: 3, formula: '=ROUND(A1/10,1)'},
+      {row: 0, col: 4, formula: '=POWER(A1,2)'},
+      {row: 0, col: 5, formula: '=UPPER(TRIM(B1))'},
+      {row: 0, col: 6, formula: '=AND(A1>5,D1=1.2)'},
+      {row: 0, col: 7, formula: '=LEN(F1)'},
+      {row: 0, col: 8, formula: '=CONCAT(F1,"-",C1)'},
+    ],
+  });
+  const sheet = result.workbook.sheets.get('sheet-1');
+
+  assert.equal(getCachedCellDisplayValue(sheet, 0, 2), 'ok');
+  assert.equal(getCachedCellDisplayValue(sheet, 0, 3), '1.2');
+  assert.equal(getCachedCellDisplayValue(sheet, 0, 4), '144');
+  assert.equal(getCachedCellDisplayValue(sheet, 0, 5), 'ADA LOVELACE');
+  assert.equal(getCachedCellDisplayValue(sheet, 0, 6), 'TRUE');
+  assert.equal(getCachedCellDisplayValue(sheet, 0, 7), '12');
+  assert.equal(getCachedCellDisplayValue(sheet, 0, 8), 'ADA LOVELACE-ok');
+});
+
 test('range format commands format display values and undo cleanly', () => {
   let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
   workbook = dispatchCommandWithRecalculation(workbook, {
