@@ -9,7 +9,7 @@ import {Table, proportional, pixel} from '@astryxdesign/core/Table';
 import {cellAddress} from '../model/address.js';
 import {displayCellValue, readCell} from '../model/formulas.js';
 
-export function InspectorPanel({gridConfig, getDefaultCellValue, view, activeCell, selection, rowOverrides, colOverrides, cellMetaRef, rowMetaRef, edits, fps, dataRef}) {
+export function InspectorPanel({gridConfig, getDefaultCellValue, view, activeCell, selection, rowOverrides, colOverrides, cellMetaRef, rowMetaRef, edits, calculationStats, fps, dataRef}) {
   const selectedText = selection ? `${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}` : 'none';
   const visibleCells = Math.max(0, (view.rowEnd - view.rowStart + 1) * (view.colEnd - view.colStart + 1));
   const activeRaw = readCell(dataRef, activeCell.row, activeCell.col, getDefaultCellValue);
@@ -18,6 +18,9 @@ export function InspectorPanel({gridConfig, getDefaultCellValue, view, activeCel
     {id: 'mounted', metric: 'Mounted cells', value: visibleCells.toLocaleString(), status: 'Live'},
     {id: 'total', metric: 'Logical cells', value: (gridConfig.rows * gridConfig.cols).toLocaleString(), status: 'Virtual'},
     {id: 'edits', metric: 'Edited cells', value: String(edits), status: 'Sparse'},
+    {id: 'formulas', metric: 'Formula cells', value: String(calculationStats?.formulas || 0), status: 'Calc'},
+    {id: 'cached', metric: 'Cached formulas', value: String(calculationStats?.cached || 0), status: 'Cache'},
+    {id: 'errors', metric: 'Formula errors', value: String(calculationStats?.errors || 0), status: 'Calc'},
     {id: 'rows', metric: 'Custom rows', value: String(rowOverrides.size), status: 'Map'},
     {id: 'cols', metric: 'Custom columns', value: String(colOverrides.size), status: 'Map'},
     {id: 'fps', metric: 'Approx FPS', value: String(fps), status: 'rAF'},
@@ -25,7 +28,7 @@ export function InspectorPanel({gridConfig, getDefaultCellValue, view, activeCel
   const columns = [
     {key: 'metric', header: 'Metric', width: proportional(1)},
     {key: 'value', header: 'Value', align: 'end', width: pixel(92)},
-    {key: 'status', header: 'Mode', align: 'center', width: pixel(88), renderCell: (item) => <Badge variant={item.status === 'Live' ? 'success' : item.status === 'Virtual' ? 'purple' : 'blue'} label={item.status} />},
+    {key: 'status', header: 'Mode', align: 'center', width: pixel(88), renderCell: (item) => <Badge variant={item.status === 'Live' ? 'success' : item.status === 'Virtual' ? 'purple' : item.status === 'Calc' ? 'warning' : 'blue'} label={item.status} />},
   ];
   return (
     <Card className="side-panel" padding={4}>

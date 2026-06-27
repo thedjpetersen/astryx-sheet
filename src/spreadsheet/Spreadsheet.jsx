@@ -483,6 +483,18 @@ export function Spreadsheet({
 
   const rows = useMemo(() => Array.from({length: Math.max(0, view.rowEnd - view.rowStart + 1)}, (_, i) => view.rowStart + i), [view.rowStart, view.rowEnd]);
   const columns = useMemo(() => Array.from({length: Math.max(0, view.colEnd - view.colStart + 1)}, (_, i) => view.colStart + i), [view.colStart, view.colEnd]);
+  const calculationStats = useMemo(() => {
+    let formulas = 0;
+    let cached = 0;
+    let errors = 0;
+    for (const cell of activeSheet.cells.values()) {
+      if (!cell?.formula) continue;
+      formulas++;
+      if ('computedValue' in cell || 'displayValue' in cell) cached++;
+      if (cell.error) errors++;
+    }
+    return {formulas, cached, errors};
+  }, [activeSheet]);
   const totalWidth = colMetrics.total();
   const totalHeight = rowMetrics.total();
   const activeAddress = cellAddress(activeCell.row, activeCell.col);
@@ -595,6 +607,7 @@ export function Spreadsheet({
             cellMetaRef={cellMetaRef}
             rowMetaRef={rowMetaRef}
             edits={cellDataRef.current.size}
+            calculationStats={calculationStats}
             fps={fps}
             dataRef={cellDataRef}
           />
