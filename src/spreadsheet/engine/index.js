@@ -6,6 +6,7 @@ export {dispatchCommandWithRecalculation, evaluateCellForCache, getCachedCellDis
 export {buildDependencyGraph, collectDependentCells, extractFormulaReferences, getFormulaRecalculationOrder} from './dependencies.js';
 export {cloneFilter, createFilter, createFilterStore, getVisibleRowsForFilter, getVisibleRowsForSheet, matchesFilterCriterion} from './filters.js';
 export {NumberFormatType, formatValue, mergeCellFormat} from './formatting.js';
+export {assertNoMergeOverlap, cloneMergedRange, createMergeStore, createMergedRange, getMergeAtCell, listMergedRanges, mergeIdForRange, rangesIntersect} from './merges.js';
 export {cloneNamedRange, createNamedRange, createNamedRangeStore, expandNamedRangesInFormula, getNamedRange, listNamedRanges, normalizeName, rangeToFormulaReference} from './names.js';
 export {deserializeWorkbook, serializeWorkbook} from './serialization.js';
 export {

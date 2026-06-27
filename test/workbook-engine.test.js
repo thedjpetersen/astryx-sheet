@@ -17,8 +17,10 @@ import {
   getCachedCellDisplayValue,
   getCellDisplayValue,
   getCellRawValue,
+  getMergeAtCell,
   getVisibleRowsForSheet,
   getNamedRange,
+  listMergedRanges,
   listNamedRanges,
   NumberFormatType,
   parseDelimited,
@@ -284,6 +286,24 @@ test('filter commands track visible rows and restore with undo', () => {
 
   workbook = undo(workbook);
   assert.equal(getVisibleRowsForSheet(workbook, 'sheet-1'), null);
+});
+
+test('merged ranges are validated, undoable, and serialized', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.MERGE_RANGE,
+    range: {r1: 1, c1: 1, r2: 2, c2: 3},
+  });
+
+  assert.deepEqual(getMergeAtCell(workbook.sheets.get('sheet-1'), 2, 2).range, {r1: 1, c1: 1, r2: 2, c2: 3});
+  assert.equal(listMergedRanges(workbook.sheets.get('sheet-1')).length, 1);
+  assert.throws(() => dispatchCommand(workbook, {type: CommandType.MERGE_RANGE, range: {r1: 2, c1: 2, r2: 3, c2: 4}}), /overlaps/);
+
+  const restored = deserializeWorkbook(serializeWorkbook(workbook));
+  assert.deepEqual(getMergeAtCell(restored.sheets.get('sheet-1'), 1, 1).range, {r1: 1, c1: 1, r2: 2, c2: 3});
+
+  workbook = undo(workbook);
+  assert.equal(getMergeAtCell(workbook.sheets.get('sheet-1'), 1, 1), null);
 });
 
 test('named ranges are undoable and survive snapshots', () => {

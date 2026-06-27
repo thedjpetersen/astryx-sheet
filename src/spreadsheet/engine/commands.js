@@ -3,6 +3,7 @@ import {normalizeSelection} from '../model/selection.js';
 import {cloneCellRecord, normalizeCellRecord} from './cells.js';
 import {cloneFilter, createFilter} from './filters.js';
 import {mergeCellFormat} from './formatting.js';
+import {assertNoMergeOverlap, cloneMergedRange, createMergedRange} from './merges.js';
 import {cloneNamedRange, createNamedRange, normalizeName} from './names.js';
 import {cloneSheet, cloneWorkbook, createSheet, getSheet, setCellRecord, withClonedSheet} from './workbook.js';
 
@@ -15,6 +16,8 @@ export const CommandType = {
   SORT_RANGE: 'SORT_RANGE',
   SET_FILTER: 'SET_FILTER',
   CLEAR_FILTER: 'CLEAR_FILTER',
+  MERGE_RANGE: 'MERGE_RANGE',
+  UNMERGE_RANGE: 'UNMERGE_RANGE',
   RESIZE_ROW: 'RESIZE_ROW',
   RESIZE_COLUMN: 'RESIZE_COLUMN',
   ADD_SHEET: 'ADD_SHEET',
@@ -233,6 +236,35 @@ function applyClearFilter(workbook, command) {
   };
 }
 
+function applyMergeRange(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const merge = createMergedRange(command.merge || command);
+  const oldMerge = cloneMergedRange(getSheet(workbook, sheetId).merges.get(merge.id));
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
+    assertNoMergeOverlap(sheet.merges, merge, merge.id);
+    sheet.merges.set(merge.id, merge);
+  });
+  return {
+    workbook: nextWorkbook,
+    inverse: oldMerge
+      ? {type: CommandType.MERGE_RANGE, sheetId, merge: oldMerge}
+      : {type: CommandType.UNMERGE_RANGE, sheetId, id: merge.id},
+  };
+}
+
+function applyUnmergeRange(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const id = command.id || (command.range ? createMergedRange(command).id : undefined);
+  const oldMerge = cloneMergedRange(getSheet(workbook, sheetId).merges.get(id));
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
+    sheet.merges.delete(id);
+  });
+  return {
+    workbook: nextWorkbook,
+    inverse: oldMerge ? {type: CommandType.MERGE_RANGE, sheetId, merge: oldMerge} : {type: CommandType.UNMERGE_RANGE, sheetId, id},
+  };
+}
+
 function applyResizeDimension(workbook, command, kind) {
   const sheetId = command.sheetId || workbook.activeSheetId;
   const mapName = kind === 'row' ? 'rowHeights' : 'colWidths';
@@ -339,6 +371,8 @@ export function applyWorkbookCommand(workbook, command) {
   if (command.type === CommandType.SORT_RANGE) return applySortRange(workbook, command);
   if (command.type === CommandType.SET_FILTER) return applySetFilter(workbook, command);
   if (command.type === CommandType.CLEAR_FILTER) return applyClearFilter(workbook, command);
+  if (command.type === CommandType.MERGE_RANGE) return applyMergeRange(workbook, command);
+  if (command.type === CommandType.UNMERGE_RANGE) return applyUnmergeRange(workbook, command);
   if (command.type === CommandType.RESIZE_ROW) return applyResizeDimension(workbook, command, 'row');
   if (command.type === CommandType.RESIZE_COLUMN) return applyResizeDimension(workbook, command, 'col');
   if (command.type === CommandType.ADD_SHEET) return applyAddSheet(workbook, command);

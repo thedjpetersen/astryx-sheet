@@ -5,6 +5,7 @@ import {displayCellValue} from '../model/formulas.js';
 import {cellRecordToRaw, cellRecordToSerializable, cloneCellRecord, normalizeCellRecord} from './cells.js';
 import {cloneFilter, createFilterStore} from './filters.js';
 import {formatValue} from './formatting.js';
+import {cloneMergedRange, createMergeStore} from './merges.js';
 import {cloneNamedRange, createNamedRangeStore} from './names.js';
 
 let nextWorkbookId = 1;
@@ -50,6 +51,7 @@ export function createSheet(input = {}) {
     rowHeights: createDimensionStore(input.rowHeights),
     colWidths: createDimensionStore(input.colWidths),
     filters: createFilterStore(input.filters),
+    merges: createMergeStore(input.merges),
     metadata: input.metadata ? {...input.metadata} : {},
   };
 }
@@ -61,6 +63,7 @@ export function cloneSheet(sheet) {
     rowHeights: new Map(sheet.rowHeights),
     colWidths: new Map(sheet.colWidths),
     filters: new Map(Array.from(sheet.filters.entries(), ([id, filter]) => [id, cloneFilter(filter)])),
+    merges: new Map(Array.from(sheet.merges.entries(), ([id, merge]) => [id, cloneMergedRange(merge)])),
     metadata: {...sheet.metadata},
   };
 }
@@ -173,6 +176,7 @@ export function serializeSheetForSnapshot(sheet) {
     rowHeights: Array.from(sheet.rowHeights.entries()),
     colWidths: Array.from(sheet.colWidths.entries()),
     filters: Array.from(sheet.filters.values()).map(cloneFilter),
+    merges: Array.from(sheet.merges.values()).map(cloneMergedRange),
     metadata: {...sheet.metadata},
   };
 }
