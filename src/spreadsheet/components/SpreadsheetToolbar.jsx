@@ -31,6 +31,10 @@ export function SpreadsheetToolbar({
   onPasteClipboard,
   onEditActiveCell,
   onClearSelection,
+  onFormatNumber,
+  onFormatCurrency,
+  onFormatPercent,
+  onFormatDate,
   onWidenActiveColumn,
   onTallerActiveRow,
   themeName,
@@ -83,6 +87,10 @@ export function SpreadsheetToolbar({
         <Button label="Paste" variant="secondary" size="sm" onClick={onPasteClipboard} />
         <Button label="Edit cell" variant="secondary" size="sm" onClick={onEditActiveCell} />
         <Button label="Clear" variant="secondary" size="sm" onClick={onClearSelection} />
+        <Button label="Number" variant="secondary" size="sm" onClick={onFormatNumber} />
+        <Button label="$" variant="secondary" size="sm" onClick={onFormatCurrency} />
+        <Button label="%" variant="secondary" size="sm" onClick={onFormatPercent} />
+        <Button label="Date" variant="secondary" size="sm" onClick={onFormatDate} />
         <Button label="Widen column" variant="secondary" size="sm" onClick={onWidenActiveColumn} />
         <Button label="Taller row" variant="secondary" size="sm" onClick={onTallerActiveRow} />
         <span className="toolbar-spacer" />

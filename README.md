@@ -29,6 +29,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - React spreadsheet cell edits, clears, paste actions, and history navigation use the recalculating engine path
 - Inspector metrics for formula cells, cached formula results, and formula errors
 - Engine-level number, currency, percent, date, and text formatting with undoable range format commands
+- React toolbar actions for applying common engine-backed number formats to the current selection
 - Formula evaluation for `SUM`, `AVERAGE` / `AVG`, `MIN`, `MAX`, `COUNT`, `CONCAT`, cell references, ranges, and basic arithmetic
 - Right-click context menu for edit, clear, copy, resize, and sample formula actions
 - Live inspector panel showing mounted cells, sparse overrides, effect-registered geometry, and approximate FPS

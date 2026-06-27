@@ -11,7 +11,7 @@ import {InspectorPanel} from './components/InspectorPanel.jsx';
 import {NativeContextMenu} from './components/NativeContextMenu.jsx';
 import {RowFragment} from './components/RowFragment.jsx';
 import {SpreadsheetToolbar} from './components/SpreadsheetToolbar.jsx';
-import {CommandType, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook} from './engine/index.js';
+import {CommandType, NumberFormatType, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook} from './engine/index.js';
 import {cellAddress, cellKey, columnName} from './model/address.js';
 import {DEFAULT_GRID_CONFIG} from './model/constants.js';
 import {createDefaultCellData, createDefaultColWidths, createDefaultRowHeights, defaultCellValue} from './model/defaultData.js';
@@ -285,6 +285,22 @@ export function Spreadsheet({
     if (activeCell.row >= selection.r1 && activeCell.row <= selection.r2 && activeCell.col >= selection.c1 && activeCell.col <= selection.c2) setFormulaDraft('');
     showToast(`Cleared ${count.toLocaleString()} cell${count === 1 ? '' : 's'}`);
   }, [committedSelection, activeCell, getDefaultCellValue, showToast, onCellChange]);
+  const formatSelection = useCallback((format, label) => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    setWorkbook((currentWorkbook) => {
+      const nextWorkbook = dispatchCommand(currentWorkbook, {
+        type: CommandType.SET_RANGE_FORMAT,
+        range: selection,
+        format,
+        label: `Format ${label}`,
+      });
+      workbookRef.current = nextWorkbook;
+      onCellChange?.({selection, format, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
+      return nextWorkbook;
+    });
+    setDataVersion((v) => v + 1);
+    showToast(`Formatted ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)} as ${label}`);
+  }, [activeCell, committedSelection, onCellChange, showToast]);
   const resizeColumn = useCallback((col, size) => {
     setWorkbook((currentWorkbook) => {
       const nextWorkbook = dispatchCommand(currentWorkbook, {type: CommandType.RESIZE_COLUMN, col, size});
@@ -532,6 +548,10 @@ export function Spreadsheet({
           onPasteClipboard={pasteClipboardAtActiveCell}
           onEditActiveCell={() => openEditor(activeCell.row, activeCell.col)}
           onClearSelection={clearSelection}
+          onFormatNumber={() => formatSelection({type: NumberFormatType.NUMBER, decimals: 2}, 'number')}
+          onFormatCurrency={() => formatSelection({type: NumberFormatType.CURRENCY, currency: 'USD', decimals: 2}, 'currency')}
+          onFormatPercent={() => formatSelection({type: NumberFormatType.PERCENT, decimals: 1}, 'percent')}
+          onFormatDate={() => formatSelection({type: NumberFormatType.DATE}, 'date')}
           onWidenActiveColumn={() => resizeColumn(activeCell.col, colMetrics.size(activeCell.col) + 20)}
           onTallerActiveRow={() => resizeRow(activeCell.row, rowMetrics.size(activeCell.row) + 6)}
           themeName={themeName}
@@ -580,6 +600,8 @@ export function Spreadsheet({
                     registerRow={registerRow}
                     registerCell={registerCell}
                     activeCell={activeCell}
+                    workbook={workbook}
+                    sheetId={activeSheet.id}
                     dataRef={cellDataRef}
                     dataVersion={dataVersion}
                     getDefaultCellValue={getDefaultCellValue}

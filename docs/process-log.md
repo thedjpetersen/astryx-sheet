@@ -19,6 +19,7 @@
 - Connected React cell edits, clears, paste actions, and history navigation to the recalculating engine path.
 - Surfaced formula count, cached formula count, and formula error metrics in the inspector.
 - Added engine-level display formatting and undoable range format commands.
+- Moved rendered grid display through the engine display formatter and added toolbar actions for common formats.
 
 ## Current Direction
 
@@ -27,4 +28,4 @@ The package should grow around two public layers:
 - A workbook engine that can run without React and eventually own Excel-scale state, formulas, commands, history, import/export, and collaboration hooks.
 - A virtualized React grid that consumes the engine and can be embedded with or without the Astryx toolbar and themes.
 
-The next implementation pass should expose common formatting actions in the React toolbar and expand paste semantics for formatting-oriented external clipboard payloads and larger ranges.
+The next implementation pass should expand paste semantics for formatting-oriented external clipboard payloads and larger ranges.
