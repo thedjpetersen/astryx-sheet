@@ -41,6 +41,103 @@
 - Expanded formula evaluation with argument parsing, comparisons, `IF`, logical functions, scalar math helpers, and text helpers.
 - Added a dependency-free SpreadsheetML XML adapter for Excel-readable multi-sheet workbook import/export.
 - Added toolbar commands for creating and removing workbook named ranges from the active selection.
+- Routed the React spreadsheet command path through `createWorkbookController`, while preserving engine event metadata for host callbacks.
+- Added optional `workbookController` embedding support so hosts can mount the React grid over a headless controller instance.
+- Expanded formula evaluation with Excel-style `SUMIF`, `COUNTIF`, `AVERAGEIF`, `SUMIFS`, `COUNTIFS`, `AVERAGEIFS`, `INDEX`, `MATCH`, `VLOOKUP`, `HLOOKUP`, and `XLOOKUP` support.
+- Added the new formula functions to the React function picker so UI-inserted formulas use the same headless evaluator path.
+- Added cross-sheet formula evaluation for references such as `Inputs!A1` and quoted names like `'FY 2026'!A1:B5`.
+- Made recalculating dispatch refresh formulas across workbook sheets so source-sheet edits update dependent model sheets.
+- Added undoable row/column insert and delete commands that shift sparse cells, row/column dimensions, merges, validations, filters, named ranges, and same-sheet/cross-sheet formula references.
+- Added React context-menu actions for row/column insertion and deletion through the controller-backed command path.
+- Added headless Fill Down and Fill Right command builders that copy source edges, preserve metadata, and translate relative formulas.
+- Added React context-menu Fill Down/Fill Right actions and preserved selected ranges when opening the menu inside the current selection.
+- Added an exported formula catalog and reusable formula-template helper so UI surfaces discover functions from the formula model instead of maintaining a hard-coded list.
+- Expanded formula evaluation with date helpers, text extraction/search/substitution helpers, statistical helpers, `SUMPRODUCT`, and additional scalar math helpers.
+- Improved formula expression parsing so function calls can participate in top-level arithmetic and comparisons, such as `SUM(A1:A3)+B1`.
+- Added Excel-style expression syntax for exponent `^`, postfix percent, and text concatenation with `&`.
+- Added spreadsheet-style error results and cache metadata for invalid formula arithmetic, math domains, unknown functions, and propagated error references.
+- Added headless controller calculation modes with manual dirty tracking, explicit `calculate()`, persisted calculation metadata, and full-cache refresh for formula-context commands such as named-range changes.
+- Added a workbook-level dependency graph so ordinary cell edits selectively recalculate dirty formulas across sheets instead of refreshing every formula cache.
+- Made manual-mode `calculate()` and switches back to automatic mode consume the tracked dirty sheet map, so explicit recalculation uses the same selective workbook scheduler.
+- Added volatile formula support for `TODAY`, `NOW`, `RAND`, and `RANDBETWEEN`, including dependent recalculation and deterministic formula hooks for tests.
+- Added defensive error/information functions such as `IFERROR`, `IFNA`, `ISERROR`, `ISNA`, `ISBLANK`, `ISNUMBER`, and `ISTEXT`.
+- Added more Excel-style logical, text, math, and statistical helpers including `IFS`, `SWITCH`, `CHOOSE`, `VALUE`, `EXACT`, `REPT`, `REPLACE`, `TRUNC`, `SIGN`, `CEILING`, `FLOOR`, `STDEV.S`, `STDEV.P`, `VAR.S`, and `VAR.P`.
+- Expanded the formula parser to handle dotted function names, so functions such as `STDEV.S` work both as whole formulas and nested inside other expressions.
+- Added whole-column and whole-row formula ranges such as `A:A`, `A:C`, `1:1`, and `1:3`, including bounded evaluation and dependency tracking across sheets.
+- Extended formula-reference shifting so copy/fill and structural row/column edits preserve whole-row and whole-column ranges across sheets.
+- Made named-range expansion and dependency extraction ignore text literals and preserve sheet qualifiers, preventing false dirty dependencies and sheet/name collisions.
+- Expanded workbook-scoped named ranges into sheet-qualified references so formulas on one sheet can depend on named ranges backed by another sheet.
+- Bound cross-sheet whole-row and whole-column range evaluation/dependency extraction to the referenced sheet dimensions instead of the formula sheet dimensions.
+- Extended the SpreadsheetML adapter to export and import merged ranges with `ss:MergeAcross` and `ss:MergeDown` metadata.
+- Extended SpreadsheetML export/import to preserve workbook named ranges and remap sheet-name references back to engine sheet ids on import.
+- Extended SpreadsheetML style export/import to preserve engine number, currency, percent, date, and text formats through Excel-readable round trips.
+- Added headless conditional-formatting rules with number, text, blank, and error predicates, undo/redo commands, snapshot serialization, structural range shifting, and React grid rendering through the controller path.
+- Added toolbar actions for number and text highlights plus clearing conditional formats, keeping conditional-format mutations in the workbook engine instead of React-only UI state.
+- Extended SpreadsheetML export/import to preserve engine conditional-formatting rules and styles across dependency-free workbook round trips.
+- Added headless cell-note commands, grid note markers/tooltips, context-menu note editing, snapshot persistence, and SpreadsheetML comment import/export.
+- Added headless range style commands for bold text, borders, fill color, text color, and alignment, with React toolbar actions, grid rendering, undo/redo, snapshots, and SpreadsheetML style import/export.
+- Added headless cell hyperlink commands, grid hyperlink styling/tooltips, context-menu link editing/opening, snapshot persistence, and SpreadsheetML `ss:HRef` import/export.
+- Expanded formula evaluation and picker templates with financial helpers for `PMT`, `PV`, `FV`, `NPV`, and `IRR`, including focused engine tests for normal outputs and numeric-domain errors.
+- Added reference metadata formulas `ROW`, `COLUMN`, `ROWS`, and `COLUMNS`, including origin-aware nested evaluation and cross-sheet whole-row/whole-column dimension tests.
+- Added date-difference and workday formulas `DAYS`, `DATEDIF`, `WEEKDAY`, `NETWORKDAYS`, and `WORKDAY`, with holiday-range handling and scalar endpoint templates for the shared function picker.
+- Added aggregate helper formulas `PRODUCT`, `SUMSQ`, `COUNTBLANK`, and `AVERAGEA`, including picker templates and tests for blank/text/boolean coercion.
+- Added logarithm, exponential, trigonometry, and angle-conversion formulas including `EXP`, `LN`, `LOG`, `LOG10`, `PI`, `SIN`, `COS`, `TAN`, `RADIANS`, and `DEGREES`.
+- Added conditional extrema formulas `MINIFS` and `MAXIFS` through the shared conditional aggregate evaluator and function-picker templates.
+- Added lookup formulas `XMATCH` and vector-form `LOOKUP`, including wildcard/reverse-search and approximate vector lookup coverage.
+- Added serial time formulas `TIME`, `HOUR`, `MINUTE`, and `SECOND`, including nested date/time arithmetic tests and picker templates.
+- Added percentile and quartile formulas `PERCENTILE.INC`, `PERCENTILE.EXC`, `QUARTILE.INC`, and `QUARTILE.EXC`, including interpolation and invalid-bound tests.
+- Added parsed date/time and week-number formulas `DATEVALUE`, `TIMEVALUE`, `WEEKNUM`, and `ISOWEEKNUM`, with invalid parse coverage and picker templates.
+- Added text normalization, character-code, and delimiter formulas `PROPER`, `CHAR`, `CODE`, `TEXTBEFORE`, and `TEXTAFTER`, with reverse, case-insensitive, and fallback delimiter tests.
+- Added information helper formulas `ISLOGICAL`, `ISNONTEXT`, `N`, `T`, `NA`, `TYPE`, and `ERROR.TYPE`, including error-code propagation tests and picker templates.
+- Added Excel math helpers `MROUND`, `QUOTIENT`, `EVEN`, `ODD`, `FACT`, `FACTDOUBLE`, `GCD`, `LCM`, `COMBIN`, and `PERMUT`, and aligned `MOD` with Excel divisor-sign behavior.
+- Added 30/360, year-fraction, and custom-weekend date formulas `DAYS360`, `YEARFRAC`, `NETWORKDAYS.INTL`, and `WORKDAY.INTL`, including holiday-range and invalid-weekend tests.
+- Added text cleaning and text-formatting formulas `CLEAN`, `NUMBERVALUE`, `FIXED`, `DOLLAR`, and `TEXT`, with focused tests for custom separators, percent parsing, currency text, and common numeric/date masks.
+- Added statistical helper formulas `MODE.SNGL`, `RANK.EQ`, `RANK.AVG`, `GEOMEAN`, `HARMEAN`, `CORREL`, `COVARIANCE.P`, and `COVARIANCE.S`, with tied-rank, no-mode, zero-variance, and mismatched-pair coverage.
+- Added loan-period and amortization financial formulas `NPER`, `RATE`, `IPMT`, and `PPMT`, with tests for Excel sign conventions, begin-period payments, and invalid periods.
+- Added function-form booleans and information helpers `TRUE`, `FALSE`, `XOR`, `ISEVEN`, `ISODD`, `ISFORMULA`, and `FORMULATEXT`, including raw-formula access through the headless evaluation options.
+- Added irregular cash-flow financial formulas `XNPV` and `XIRR`, with paired value/date range handling and invalid rate/sign/range coverage.
+- Added regression and forecast statistical formulas `SLOPE`, `INTERCEPT`, `RSQ`, `FORECAST.LINEAR`, and `FORECAST`, reusing paired-range validation with zero-variance tests.
+- Added reference text helpers `ADDRESS` and scalar/range `INDIRECT`, including A1/R1C1 address generation, cross-sheet references, aggregate range expansion, and invalid-reference coverage.
+- Added volatile `OFFSET` support as a reference-producing helper, including direct scalar reads, aggregate/lookups over computed ranges, cross-sheet references, and invalid-reference coverage.
+- Reworked the formula editor surface with engine-owned function help metadata, formula-bar autocomplete, argument-aware signatures, keyboard suggestion navigation, searchable/category-filtered function browsing, draft/insert flows, descriptions, and range-aware template previews.
+- Added headless formula draft preview evaluation and surfaced live formula-bar result/error previews through the same workbook engine path used by committed formulas.
+- Added formula draft diagnostics for unknown functions, unmatched quotes/parentheses, trailing operators, and evaluated spreadsheet errors, with the React formula editor rendering diagnostic chips from the engine preview result.
+- Added headless formula diagnostics for function argument counts, using catalog signatures to warn on missing or extra arguments before formulas are committed.
+- Added named-range typo diagnostics and quick fixes for formula drafts, so `#NAME?` previews can suggest workbook names such as `Revenue` from the headless engine path.
+- Aligned unresolved bare identifiers with Excel-style `#NAME?` propagation inside function arguments instead of allowing aggregates to silently treat them as zero.
+- Added sheet-name typo diagnostics and formula-bar quick fixes for qualified references, while correcting unknown sheet references to return `#REF!` instead of falling back to the active sheet.
+- Added invalid-reference diagnostics for out-of-bounds formula references such as `A0` and `XFE1`, with evaluator propagation to `#REF!` instead of blank/text/zero fallbacks.
+- Added model-backed formula editor suggestions for named ranges alongside functions, including sheet-scope filtering, generic identifier completion, and React autocomplete rendering for named-range entries.
+- Added reusable formula-reference draft insertion helpers and wired grid click/drag range picking into active formula-bar edits without changing the formula target cell.
+- Added model-backed formula draft tokenization and rendered function, reference, named-range, literal, error, and operator tokens in the React formula editor for color-coded formula review.
+- Added colored same-sheet grid overlays for formula editor references, including ordinary ranges, qualified active-sheet references, named ranges, whole rows/columns, and dynamic-array spill references.
+- Added formula-editor reference replacement and Excel-style `F4` absolute/relative reference cycling for cells, ranges, quoted sheet references, whole rows/columns, and spilled references.
+- Tightened formula editor autocomplete so suggestions stay active for real identifier drafts but suppress themselves inside completed cell references, range drafts, sheet-qualified references, and string literals.
+- Added regression coverage that locks function evaluation, formula previews, diagnostics, tokenization, and autocomplete to case-insensitive Excel-style function names.
+- Tuned formula autocomplete ranking to prefer exact matches and catalog-priority prefix matches, so common spreadsheet functions such as `SUM` surface before less common alphabetical matches.
+- Interleaved named ranges into formula autocomplete ranking so user-defined names can beat lower-priority function prefix matches while common functions such as `SUM` remain first for function-looking drafts.
+- Added closest-function hints to unknown-function diagnostics so typos such as `SUMM` and `XLOKUP` point users toward the canonical implemented functions.
+- Wired unknown-function diagnostics to formula-bar quick fixes that safely replace typoed function-call names while ignoring string literals and quoted sheet names.
+- Upgraded formula-bar function autocomplete to insert paired call parentheses such as `SUM()` with the caret inside, while preserving the older `SUM(` helper behavior for non-UI callers.
+- Added model-owned function-signature parsing and React argument highlighting so formula help can emphasize the active parameter instead of rendering only flat signature text.
+- Added workbook sheet-name autocomplete for formulas, including simple qualifiers like `Inputs!`, quoted qualifiers like `'Q1 Sales'!`, and ambiguous sheet prefixes such as `Q1` that otherwise look like cell references.
+- Added editor and engine coverage for sheet names containing apostrophes, including escaped qualifiers such as `'Bob''s Plan'!A1`.
+- Extended sheet-name autocomplete to quoted partial drafts such as `='Q1` and `='Bob`, preserving escaped apostrophe qualifiers when completing formulas.
+- Added Excel/Sheets-compatible `LET` formula evaluation with scoped formula variables, nested expression support, catalog help, picker templates, direct literal formula results, and unknown-name errors.
+- Expanded formula editor autocomplete to the full engine-owned function catalog and added catalog-template coverage tests to catch picker formulas that the headless evaluator cannot execute.
+- Hardened reusable formula templates across the full function catalog so formula help examples execute cleanly under headless preview, with the only intentional error example being `NA()`.
+- Added formula-editor argument intelligence for paired functions such as `COUNTIFS`, `SUMIFS`, `IFS`, and `LET`, including active argument labels and diagnostics for unmatched pairs or missing final calculations.
+- Added range-shape validation and formula-editor diagnostics for incompatible criteria, lookup, and `SUMPRODUCT` ranges, aligning committed formula errors with draft preview guidance.
+- Added option-value diagnostics for lookup and dynamic-array formulas, and aligned `MATCH`/`XLOOKUP` mode validation with the stricter `XMATCH`/`SORT` evaluator paths.
+- Added static reference-index diagnostics for `INDEX`, `VLOOKUP`, `HLOOKUP`, and `SORT`, so formula previews explain out-of-range row, column, and sort selectors instead of showing only generic errors.
+- Added option-value diagnostics for date and workday formulas such as `WEEKDAY`, `WEEKNUM`, `YEARFRAC`, `NETWORKDAYS.INTL`, and `WORKDAY.INTL`, covering invalid return types, bases, weekend codes, and weekend patterns.
+- Added numeric-domain diagnostics for dynamic array, percentile/quartile, text-position, random integer, and financial timing/type arguments, while aligning text helpers such as `LEFT`, `MID`, `FIND`, and `SEARCH` with Excel-style `#VALUE!` behavior for invalid positions.
+- Refactored the formula editor into a modular Excel-like formula bar with a name box, `fx` affordance, edit accept/cancel controls, layered token coloring, and contextual function guidance rendered from StyleX-backed component styles.
+- Extended `LET` formula variables to hold range references such as `LET(r,A1:A4,SUM(r))`, including graph-driven dirty recalculation for formulas that consume those range variables.
+- Added first-pass dynamic-array formula values for `FILTER`, `UNIQUE`, `SORT`, `SEQUENCE`, and `TRANSPOSE`, including nested consumption by aggregators, `INDEX`, `ROWS`, `LET`, formula previews, and picker templates.
+- Added engine-backed dynamic-array spill reads through `createSheetDataRef`, `getCellDisplayValue`, and cached display helpers, including React grid spill-cell rendering and `#SPILL!` display for blocked spill ranges.
+- Added dependency-graph edges for dynamic-array spill footprints so formulas that read spilled cells recalculate when the spill origin changes, and blocked spill origins recalculate when blocking cells are cleared.
+- Added Excel-style spilled-range references such as `A1#` to the evaluator, formula dependency graph, and formula editor tokenizer, including `#SPILL!` propagation when the referenced spill origin is blocked.
 
 ## Current Direction
 

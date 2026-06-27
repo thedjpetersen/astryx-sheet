@@ -1,12 +1,13 @@
 import {cellKey} from '../model/address.js';
 import {DEFAULT_GRID_CONFIG} from '../model/constants.js';
 import {defaultCellValue} from '../model/defaultData.js';
-import {displayCellValue} from '../model/formulas.js';
+import {evaluateFormula, formatFormulaResult, formulaArrayCellValue, formulaArrayDimensions, isFormulaArrayValue} from '../model/formulas.js';
 import {cellRecordToRaw, cellRecordToSerializable, cloneCellRecord, normalizeCellRecord} from './cells.js';
+import {cloneConditionalFormat, createConditionalFormatStore} from './conditionalFormatting.js';
 import {cloneFilter, createFilterStore} from './filters.js';
 import {formatValue} from './formatting.js';
 import {cloneMergedRange, createMergeStore} from './merges.js';
-import {cloneNamedRange, createNamedRangeStore} from './names.js';
+import {cloneNamedRange, createNamedRangeStore, expandNamedRangesInFormula} from './names.js';
 import {cloneValidationRule, createValidationStore} from './validation.js';
 
 let nextWorkbookId = 1;
@@ -54,6 +55,7 @@ export function createSheet(input = {}) {
     filters: createFilterStore(input.filters),
     merges: createMergeStore(input.merges),
     validations: createValidationStore(input.validations),
+    conditionalFormats: createConditionalFormatStore(input.conditionalFormats),
     metadata: input.metadata ? {...input.metadata} : {},
   };
 }
@@ -67,6 +69,7 @@ export function cloneSheet(sheet) {
     filters: new Map(Array.from(sheet.filters.entries(), ([id, filter]) => [id, cloneFilter(filter)])),
     merges: new Map(Array.from(sheet.merges.entries(), ([id, merge]) => [id, cloneMergedRange(merge)])),
     validations: new Map(Array.from(sheet.validations.entries(), ([id, rule]) => [id, cloneValidationRule(rule)])),
+    conditionalFormats: new Map(Array.from(sheet.conditionalFormats.entries(), ([id, rule]) => [id, cloneConditionalFormat(rule)])),
     metadata: {...sheet.metadata},
   };
 }
@@ -141,12 +144,112 @@ export function getCellRawValue(workbook, sheetId, row, col, options = {}) {
   return getDefaultCellValue(row, col);
 }
 
-export function createSheetDataRef(sheet) {
+function parseCellKey(key) {
+  const [row, col] = String(key).split(':').map(Number);
+  return {row, col};
+}
+
+function isSpillBlocked(sheet, originRow, originCol, arrayValue) {
+  const size = formulaArrayDimensions(arrayValue);
+  if (size.rows <= 0 || size.cols <= 0) return false;
+  for (let rowOffset = 0; rowOffset < size.rows; rowOffset++) {
+    for (let colOffset = 0; colOffset < size.cols; colOffset++) {
+      if (rowOffset === 0 && colOffset === 0) continue;
+      if (sheet.cells.has(cellKey(originRow + rowOffset, originCol + colOffset))) return true;
+    }
+  }
+  return false;
+}
+
+export function getCellSpillInfo(sheet, row, col) {
+  if (!sheet || sheet.cells.has(cellKey(row, col))) return null;
+  for (const [originKey, cell] of sheet.cells.entries()) {
+    if (!cell?.formula || !isFormulaArrayValue(cell.computedValue)) continue;
+    const origin = parseCellKey(originKey);
+    const size = formulaArrayDimensions(cell.computedValue);
+    if (row < origin.row || col < origin.col || row >= origin.row + size.rows || col >= origin.col + size.cols) continue;
+    if (isSpillBlocked(sheet, origin.row, origin.col, cell.computedValue)) continue;
+    return {
+      origin,
+      rowOffset: row - origin.row,
+      colOffset: col - origin.col,
+      value: formulaArrayCellValue(cell.computedValue, row - origin.row, col - origin.col),
+      range: {r1: origin.row, c1: origin.col, r2: origin.row + size.rows - 1, c2: origin.col + size.cols - 1},
+    };
+  }
+  return null;
+}
+
+export function getCellSpillRange(sheet, row, col) {
+  const cell = sheet?.cells.get(cellKey(row, col));
+  if (!cell?.formula || !isFormulaArrayValue(cell.computedValue)) return null;
+  if (isSpillBlocked(sheet, row, col, cell.computedValue)) return '#SPILL!';
+  const size = formulaArrayDimensions(cell.computedValue);
+  return {sheetName: sheet.name, range: {r1: row, c1: col, r2: row + size.rows - 1, c2: col + size.cols - 1}};
+}
+
+export function createSheetDataRef(sheet, options = {}) {
+  const includeSpillValues = options.useComputedValues || options.includeSpillValues;
   return {
     current: {
-      has: (key) => sheet.cells.has(key),
-      get: (key) => cellRecordToRaw(sheet.cells.get(key)),
+      has: (key) => {
+        if (sheet.cells.has(key)) return true;
+        if (!includeSpillValues) return false;
+        const {row, col} = parseCellKey(key);
+        return Boolean(getCellSpillInfo(sheet, row, col));
+      },
+      get: (key) => {
+        const cell = sheet.cells.get(key);
+        if (options.useComputedValues && cell?.formula && 'computedValue' in cell) {
+          const {row, col} = parseCellKey(key);
+          return isFormulaArrayValue(cell.computedValue) && isSpillBlocked(sheet, row, col, cell.computedValue)
+            ? '#SPILL!'
+            : cell.computedValue;
+        }
+        if (cell) return cellRecordToRaw(cell);
+        if (!includeSpillValues) return undefined;
+        const {row, col} = parseCellKey(key);
+        return getCellSpillInfo(sheet, row, col)?.value;
+      },
       get size() { return sheet.cells.size; },
+    },
+  };
+}
+
+function getSheetByReference(workbook, sheetRef) {
+  if (!sheetRef) return null;
+  if (workbook.sheets.has(sheetRef)) return workbook.sheets.get(sheetRef);
+  const normalized = String(sheetRef).toLowerCase();
+  return Array.from(workbook.sheets.values()).find((sheet) => sheet.name.toLowerCase() === normalized) || null;
+}
+
+function createFormulaEvaluationOptions(workbook, sheet) {
+  return {
+    currentSheetName: sheet.name,
+    rowCount: sheet.rowCount,
+    colCount: sheet.colCount,
+    resolveSheetName(sheetRef) {
+      if (!sheetRef) return sheet.name;
+      return getSheetByReference(workbook, sheetRef)?.name || sheetRef;
+    },
+    hasSheetReference(sheetRef) {
+      return !sheetRef || Boolean(getSheetByReference(workbook, sheetRef));
+    },
+    getDataRefForSheet(sheetRef) {
+      const referencedSheet = getSheetByReference(workbook, sheetRef);
+      return referencedSheet ? createSheetDataRef(referencedSheet, {useComputedValues: true}) : null;
+    },
+    getSheetDimensionsForSheet(sheetRef) {
+      const referencedSheet = getSheetByReference(workbook, sheetRef) || sheet;
+      return {rowCount: referencedSheet.rowCount, colCount: referencedSheet.colCount};
+    },
+    getCellFormula(sheetRef, row, col) {
+      const referencedSheet = getSheetByReference(workbook, sheetRef) || sheet;
+      return referencedSheet.cells.get(cellKey(row, col))?.formula || '';
+    },
+    getSpillRangeForCell(sheetRef, row, col) {
+      const referencedSheet = getSheetByReference(workbook, sheetRef) || sheet;
+      return getCellSpillRange(referencedSheet, row, col);
     },
   };
 }
@@ -158,11 +261,22 @@ export function getCellDisplayValue(workbook, sheetId, row, col, options = {}) {
   const raw = getCellRawValue(workbook, sheetId, row, col, {getDefaultCellValue});
   const format = record?.format;
   if (record?.formula && 'computedValue' in record) {
-    return format ? formatValue(record.computedValue, format, options) : record.displayValue ?? String(record.computedValue ?? '');
+    if (isFormulaArrayValue(record.computedValue) && isSpillBlocked(sheet, row, col, record.computedValue)) return '#SPILL!';
+    return format ? formatValue(record.computedValue, format, options) : record.displayValue ?? formatFormulaResult(record.computedValue);
   }
+  const spill = getCellSpillInfo(sheet, row, col);
+  if (spill) return formatFormulaResult(spill.value);
   if (typeof raw === 'string' && raw.trim().startsWith('=')) {
-    const evaluated = displayCellValue(createSheetDataRef(sheet), row, col, getDefaultCellValue);
-    return format ? formatValue(evaluated, format, options) : evaluated;
+    const formula = expandNamedRangesInFormula(raw, workbook.namedRanges, sheetId);
+    const evaluated = evaluateFormula(
+      formula,
+      createSheetDataRef(sheet, {useComputedValues: true}),
+      {row, col, sheetName: sheet.name},
+      getDefaultCellValue,
+      new Set(),
+      createFormulaEvaluationOptions(workbook, sheet),
+    );
+    return format ? formatValue(evaluated, format, options) : formatFormulaResult(evaluated);
   }
   return format ? formatValue(raw, format, options) : raw;
 }
@@ -181,6 +295,7 @@ export function serializeSheetForSnapshot(sheet) {
     filters: Array.from(sheet.filters.values()).map(cloneFilter),
     merges: Array.from(sheet.merges.values()).map(cloneMergedRange),
     validations: Array.from(sheet.validations.values()).map(cloneValidationRule),
+    conditionalFormats: Array.from(sheet.conditionalFormats.values()).map(cloneConditionalFormat),
     metadata: {...sheet.metadata},
   };
 }

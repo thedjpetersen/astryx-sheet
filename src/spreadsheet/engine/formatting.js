@@ -64,3 +64,12 @@ export function mergeCellFormat(currentFormat, nextFormat) {
   if (nextFormat == null) return undefined;
   return {...(currentFormat || {}), ...nextFormat};
 }
+
+export function mergeCellStyle(currentStyle, nextStyle) {
+  if (nextStyle == null) return undefined;
+  const merged = {...(currentStyle || {}), ...nextStyle};
+  for (const [key, value] of Object.entries(merged)) {
+    if (value == null || value === '') delete merged[key];
+  }
+  return Object.keys(merged).length ? merged : undefined;
+}

@@ -1,5 +1,5 @@
 import React, {memo} from 'react';
-import {getCellDisplayValue, getMergeAtCell, validateCellValue} from '../engine/index.js';
+import {getCellDisplayValue, getCellRecord, getCellSpillInfo, getConditionalFormatStyle, getMergeAtCell, validateCellValue} from '../engine/index.js';
 import {cellKey} from '../model/address.js';
 import {defaultCellValue} from '../model/defaultData.js';
 import {Cell} from './Cell.jsx';
@@ -46,6 +46,10 @@ export const RowFragment = memo(function RowFragment({
         const edited = dataRef.current.has(key);
         const rawValue = edited ? dataRef.current.get(key) : getDefaultCellValue(cellRow, cellCol);
         const value = workbook ? getCellDisplayValue(workbook, sheetId, cellRow, cellCol, {getDefaultCellValue}) : rawValue;
+        const cellRecord = workbook ? getCellRecord(workbook, sheetId, cellRow, cellCol) : null;
+        const spillInfo = sheet ? getCellSpillInfo(sheet, cellRow, cellCol) : null;
+        const conditionalValue = cellRecord?.formula && 'computedValue' in cellRecord ? cellRecord.computedValue : rawValue;
+        const conditionalStyle = sheet ? getConditionalFormatStyle(sheet, cellRow, cellCol, conditionalValue) : null;
         const validationValue = typeof rawValue === 'string' && rawValue.trim().startsWith('=') ? value : rawValue;
         const validation = sheet ? validateCellValue(sheet, cellRow, cellCol, validationValue) : null;
         const active = mergeRange
@@ -62,7 +66,12 @@ export const RowFragment = memo(function RowFragment({
             height={cellHeight}
             value={value}
             rawValue={rawValue}
+            spillInfo={spillInfo}
+            note={cellRecord?.note}
+            link={cellRecord?.link}
+            cellStyle={cellRecord?.style}
             validation={validation}
+            conditionalStyle={conditionalStyle}
             mergeRange={mergeRange}
             active={active}
             edited={edited}

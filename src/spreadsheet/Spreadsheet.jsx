@@ -11,11 +11,11 @@ import {NativeContextMenu} from './components/NativeContextMenu.jsx';
 import {RowFragment} from './components/RowFragment.jsx';
 import {SheetTabs} from './components/SheetTabs.jsx';
 import {SpreadsheetToolbar} from './components/SpreadsheetToolbar.jsx';
-import {CommandType, NumberFormatType, createImportHtmlTableCommand, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, getCellRawValue, getMergeAtCell, getValidationRulesForCell, getVisibleRowsForSheet, normalizeName, rangeToHtmlTable, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook, validateCellValue} from './engine/index.js';
+import {CommandType, ConditionalFormatType, NumberFormatType, createFillDownCommand, createFillRightCommand, createImportHtmlTableCommand, createPasteTsvCommand, createSheetDataRef, createWorkbookController, getActiveSheet, getCellRawValue, getCellRecord, getCellSpillRange, getConditionalFormatRulesForCell, getMergeAtCell, getValidationRulesForCell, getVisibleRowsForSheet, listNamedRanges, normalizeName, previewFormulaDraft, rangeToHtmlTable, rangeToTsv, validateCellValue} from './engine/index.js';
 import {cellAddress, columnName} from './model/address.js';
 import {DEFAULT_GRID_CONFIG} from './model/constants.js';
 import {createDefaultCellData, createDefaultColWidths, createDefaultRowHeights, defaultCellValue} from './model/defaultData.js';
-import {readCell} from './model/formulas.js';
+import {createFormulaTemplate, formulaReferenceForSelection, getFormulaEditorReferenceHighlights, insertFormulaReferenceDraft, readCell} from './model/formulas.js';
 import {makeDimensionHelpers} from './model/dimensions.js';
 import {normalizeSelection} from './model/selection.js';
 
@@ -74,6 +74,17 @@ function normalizePromptNumber(input) {
   return Number.isFinite(number) ? number : NaN;
 }
 
+function normalizeLinkInput(input) {
+  const text = String(input ?? '').trim();
+  if (!text) return null;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(text)) return text;
+  return `https://${text}`;
+}
+
+function isOpenableLink(href) {
+  return /^(https?:|mailto:|tel:)/i.test(String(href || '').trim());
+}
+
 function defaultRangeName(selection) {
   return `Range_${cellAddress(selection.r1, selection.c1)}_${cellAddress(selection.r2, selection.c2)}`.replace(/[^A-Za-z0-9_]/g, '_');
 }
@@ -87,6 +98,8 @@ export function Spreadsheet({
   initialColWidths,
   initialMerges,
   initialValidations,
+  initialConditionalFormats,
+  workbookController,
   getDefaultCellValue = defaultCellValue,
   defaultThemeName = 'neutral',
   themeName: controlledThemeName,
@@ -122,8 +135,8 @@ export function Spreadsheet({
 
   const gridConfig = useMemo(() => ({...DEFAULT_GRID_CONFIG, ...gridConfigOverride}), [gridConfigOverride]);
   const {
-    rows: rowCount,
-    cols: colCount,
+    rows: defaultRowCount,
+    cols: defaultColCount,
     defaultRowHeight,
     defaultColWidth,
     compactRowHeight = Math.max(18, defaultRowHeight - 6),
@@ -134,22 +147,32 @@ export function Spreadsheet({
   } = gridConfig;
   const initialPoint = clampPoint({row: 1, col: 1}, gridConfig);
 
-  const [workbook, setWorkbook] = useState(() => createWorkbook({
-    sheets: [{
-      id: 'sheet-1',
-      name: 'Sheet1',
-      rowCount,
-      colCount,
-      cells: initialCells ?? createDefaultCellData(),
-      rowHeights: initialRowHeights ?? createDefaultRowHeights(),
-      colWidths: initialColWidths ?? createDefaultColWidths(),
-      merges: initialMerges,
-      validations: initialValidations,
-    }],
-  }));
+  const ownedWorkbookControllerRef = useRef(null);
+  if (!ownedWorkbookControllerRef.current) {
+    ownedWorkbookControllerRef.current = createWorkbookController({
+      sheets: [{
+        id: 'sheet-1',
+        name: 'Sheet1',
+        rowCount: defaultRowCount,
+        colCount: defaultColCount,
+        cells: initialCells ?? createDefaultCellData(),
+        rowHeights: initialRowHeights ?? createDefaultRowHeights(),
+        colWidths: initialColWidths ?? createDefaultColWidths(),
+        merges: initialMerges,
+        validations: initialValidations,
+        conditionalFormats: initialConditionalFormats,
+      }],
+    });
+  }
+  const activeWorkbookController = workbookController || ownedWorkbookControllerRef.current;
+  const workbookControllerRef = useRef(activeWorkbookController);
+  workbookControllerRef.current = activeWorkbookController;
+  const [workbook, setWorkbook] = useState(() => activeWorkbookController.getWorkbook());
   const workbookRef = useRef(workbook);
   workbookRef.current = workbook;
   const activeSheet = getActiveSheet(workbook);
+  const rowCount = activeSheet.rowCount || defaultRowCount;
+  const colCount = activeSheet.colCount || defaultColCount;
   const cellDataRef = useMemo(() => createSheetDataRef(activeSheet), [activeSheet]);
   const rowHeightsRef = useRef(activeSheet.rowHeights);
   const colWidthsRef = useRef(activeSheet.colWidths);
@@ -171,6 +194,8 @@ export function Spreadsheet({
   const [activeCell, setActiveCellState] = useState(initialPoint);
   const [committedSelection, setCommittedSelectionState] = useState(normalizeSelection(initialPoint, initialPoint));
   const [formulaDraft, setFormulaDraft] = useState(() => readCell(cellDataRef, initialPoint.row, initialPoint.col, getDefaultCellValue));
+  const [formulaEditorActive, setFormulaEditorActive] = useState(false);
+  const [formulaCursorPosition, setFormulaCursorPosition] = useState(0);
   const [editor, setEditor] = useState(null);
   const [menu, setMenu] = useState({open: false, x: 0, y: 0, row: 0, col: 0});
   const [formulaPickerOpen, setFormulaPickerOpen] = useState(false);
@@ -182,6 +207,7 @@ export function Spreadsheet({
     defaultValue: defaultHighContrastSelection,
     onChange: onHighContrastSelectionChange,
   });
+  const formulaReferenceEditRef = useRef(null);
   const size = useElementSize(viewportRef);
 
   const activeTheme = getTheme(themeName);
@@ -212,6 +238,17 @@ export function Spreadsheet({
       ...detail,
     });
   }, [onWorkbookChange]);
+  const applyWorkbookUpdate = useCallback((nextWorkbook) => {
+    workbookRef.current = nextWorkbook;
+    setWorkbook(nextWorkbook);
+    return nextWorkbook;
+  }, []);
+  const dispatchWorkbookCommand = useCallback((command, dispatchOptions = {}, eventDetail = {}) => {
+    const result = workbookControllerRef.current.dispatch(command, {...dispatchOptions, event: eventDetail});
+    applyWorkbookUpdate(result.workbook);
+    const committedEntry = result.workbook.history[result.workbook.history.length - 1];
+    return {...result, command: committedEntry?.command || command};
+  }, [applyWorkbookUpdate]);
   const validateEditCells = useCallback((cells, workbookToValidate = workbookRef.current) => {
     const failure = firstValidationFailure(getActiveSheet(workbookToValidate), cells);
     if (!failure) return true;
@@ -221,36 +258,40 @@ export function Spreadsheet({
   const syncFormulaDraftFromWorkbook = useCallback((nextWorkbook, point = activeCell) => {
     setFormulaDraft(readCell(createSheetDataRef(getActiveSheet(nextWorkbook)), point.row, point.col, getDefaultCellValue));
   }, [activeCell, getDefaultCellValue]);
-  const navigateHistory = useCallback((navigate, label) => {
-    const currentWorkbook = workbookRef.current;
-    const navigatedWorkbook = navigate(currentWorkbook);
-    if (navigatedWorkbook === currentWorkbook) return;
-    const nextWorkbook = recalculateWorkbook(navigatedWorkbook, {getDefaultCellValue}).workbook;
-    workbookRef.current = nextWorkbook;
-    setWorkbook(nextWorkbook);
+  useEffect(() => {
+    const controller = activeWorkbookController;
+    applyWorkbookUpdate(controller.getWorkbook());
+    const unsubscribe = controller.subscribe((event) => {
+      applyWorkbookUpdate(event.workbook);
+      emitWorkbookChange(event.workbook, event);
+    });
+    return unsubscribe;
+  }, [activeWorkbookController, applyWorkbookUpdate, emitWorkbookChange]);
+  const navigateHistory = useCallback((action, label) => {
+    const result = action === 'undo'
+      ? workbookControllerRef.current.undo({getDefaultCellValue})
+      : workbookControllerRef.current.redo({getDefaultCellValue});
+    if (!result.changed) return;
+    const nextWorkbook = applyWorkbookUpdate(result.workbook);
     setDataVersion((v) => v + 1);
     setDimensionVersion((v) => v + 1);
     syncFormulaDraftFromWorkbook(nextWorkbook);
-    emitWorkbookChange(nextWorkbook, {source: 'history', action: label.toLowerCase()});
     showToast(label);
-  }, [emitWorkbookChange, getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook]);
-  const undoLastCommand = useCallback(() => navigateHistory(undoWorkbook, 'Undo'), [navigateHistory]);
-  const redoLastCommand = useCallback(() => navigateHistory(redoWorkbook, 'Redo'), [navigateHistory]);
+  }, [applyWorkbookUpdate, getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook]);
+  const undoLastCommand = useCallback(() => navigateHistory('undo', 'Undo'), [navigateHistory]);
+  const redoLastCommand = useCallback(() => navigateHistory('redo', 'Redo'), [navigateHistory]);
   const commitWorkbookStructureCommand = useCallback((command, toastMessage, source = 'structure') => {
-    const nextWorkbook = dispatchCommand(workbookRef.current, command);
-    const committedEntry = nextWorkbook.history[nextWorkbook.history.length - 1];
-    workbookRef.current = nextWorkbook;
-    setWorkbook(nextWorkbook);
+    const result = dispatchWorkbookCommand(command, {}, {source});
+    const nextWorkbook = result.workbook;
     setDataVersion((v) => v + 1);
     setDimensionVersion((v) => v + 1);
     syncFormulaDraftFromWorkbook(nextWorkbook);
     setEditor(null);
     setMenu((m) => ({...m, open: false}));
     setFormulaPickerOpen(false);
-    emitWorkbookChange(nextWorkbook, {source, command: committedEntry?.command || command});
     if (toastMessage) showToast(toastMessage);
     return nextWorkbook;
-  }, [emitWorkbookChange, showToast, syncFormulaDraftFromWorkbook]);
+  }, [dispatchWorkbookCommand, showToast, syncFormulaDraftFromWorkbook]);
   const activateSheet = useCallback((sheetId) => {
     const currentWorkbook = workbookRef.current;
     if (sheetId === currentWorkbook.activeSheetId) return;
@@ -327,13 +368,10 @@ export function Spreadsheet({
     const applyPasteCommand = (command, message) => {
       if (!command.cells?.length) return false;
       if (!validateEditCells(command.cells)) return true;
-      const result = dispatchCommandWithRecalculation(workbookRef.current, command, {getDefaultCellValue});
+      const result = dispatchWorkbookCommand(command, {getDefaultCellValue}, {source: 'clipboard'});
       const nextWorkbook = result.workbook;
-      workbookRef.current = nextWorkbook;
-      setWorkbook(nextWorkbook);
       setDataVersion((v) => v + 1);
       syncFormulaDraftFromWorkbook(nextWorkbook);
-      emitWorkbookChange(nextWorkbook, {source: 'clipboard', command, recalculated: result.recalculated});
       showToast(message);
       return true;
     };
@@ -366,7 +404,7 @@ export function Spreadsheet({
       return;
     }
     pastePlainText();
-  }, [activeCell, emitWorkbookChange, getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook, validateEditCells]);
+  }, [activeCell, dispatchWorkbookCommand, getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook, validateEditCells]);
   const setActiveCell = useCallback((point) => {
     const nextPoint = clampPoint(point, gridConfig);
     setActiveCellState(nextPoint);
@@ -380,15 +418,12 @@ export function Spreadsheet({
     const nextCell = value === getDefaultCellValue(row, col) ? null : value;
     if (!validateEditCells([{row, col, cell: value}])) return false;
     const command = {type: CommandType.SET_CELL, row, col, cell: nextCell};
-    const result = dispatchCommandWithRecalculation(workbookRef.current, command, {getDefaultCellValue});
+    const result = dispatchWorkbookCommand(command, {getDefaultCellValue}, {source: 'cell'});
     const nextWorkbook = result.workbook;
-    workbookRef.current = nextWorkbook;
-    setWorkbook(nextWorkbook);
     onCellChange?.({row, col, address: cellAddress(row, col), value, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook, recalculated: result.recalculated});
-    emitWorkbookChange(nextWorkbook, {source: 'cell', command, recalculated: result.recalculated});
     setDataVersion((v) => v + 1);
     return true;
-  }, [emitWorkbookChange, getDefaultCellValue, onCellChange, validateEditCells]);
+  }, [dispatchWorkbookCommand, getDefaultCellValue, onCellChange, validateEditCells]);
   const calculateView = useCallback(() => {
     const {left, top} = scrollRef.current;
     const width = viewportRef.current?.clientWidth || size.width || 1;
@@ -414,6 +449,13 @@ export function Spreadsheet({
     overlay.style.height = `${rowMetrics.span(selection.r1, selection.r2)}px`;
   }, [rowMetrics, colMetrics]);
   const scheduleDrawSelection = useRafCallback(drawSelectionOverlay);
+  const applyFormulaReferenceSelection = useCallback((selection, edit = formulaReferenceEditRef.current) => {
+    if (!edit) return;
+    const reference = formulaReferenceForSelection(selection);
+    const next = insertFormulaReferenceDraft(edit.baseDraft, reference, edit.cursorPosition);
+    setFormulaDraft(next.value);
+    setFormulaCursorPosition(next.cursor);
+  }, []);
 
   const selectCell = useCallback((row, col) => {
     const point = clampPoint({row, col}, gridConfig);
@@ -421,6 +463,8 @@ export function Spreadsheet({
     setActiveCell(point);
     setCommittedSelection(normalizeSelection(point, point));
     setFormulaDraft(readCell(cellDataRef, point.row, point.col, getDefaultCellValue));
+    setFormulaEditorActive(false);
+    formulaReferenceEditRef.current = null;
     scheduleDrawSelection();
   }, [cellDataRef, gridConfig, getDefaultCellValue, setActiveCell, setCommittedSelection, scheduleDrawSelection]);
   const openEditor = useCallback((row, col, seed) => {
@@ -431,6 +475,8 @@ export function Spreadsheet({
       selectAll: seed == null,
       sessionId: ++editorSessionRef.current,
     });
+    setFormulaEditorActive(false);
+    formulaReferenceEditRef.current = null;
     setMenu((m) => ({...m, open: false}));
     setFormulaPickerOpen(false);
   }, [cellDataRef, getDefaultCellValue]);
@@ -449,16 +495,13 @@ export function Spreadsheet({
     for (let r = selection.r1; r <= selection.r2; r++) for (let c = selection.c1; c <= selection.c2; c++) cells.push({row: r, col: c, cell: {value: ''}});
     if (!validateEditCells(cells)) return;
     const command = {type: CommandType.SET_RANGE, cells};
-    const result = dispatchCommandWithRecalculation(workbookRef.current, command, {getDefaultCellValue});
+    const result = dispatchWorkbookCommand(command, {getDefaultCellValue}, {source: 'range-clear'});
     const nextWorkbook = result.workbook;
-    workbookRef.current = nextWorkbook;
-    setWorkbook(nextWorkbook);
     onCellChange?.({selection, value: '', cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook, recalculated: result.recalculated});
-    emitWorkbookChange(nextWorkbook, {source: 'range-clear', command, recalculated: result.recalculated});
     setDataVersion((v) => v + 1);
     if (activeCell.row >= selection.r1 && activeCell.row <= selection.r2 && activeCell.col >= selection.c1 && activeCell.col <= selection.c2) setFormulaDraft('');
     showToast(`Cleared ${count.toLocaleString()} cell${count === 1 ? '' : 's'}`);
-  }, [committedSelection, activeCell, emitWorkbookChange, getDefaultCellValue, showToast, onCellChange, validateEditCells]);
+  }, [committedSelection, activeCell, dispatchWorkbookCommand, getDefaultCellValue, showToast, onCellChange, validateEditCells]);
   const formatSelection = useCallback((format, label) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     const command = {
@@ -467,14 +510,26 @@ export function Spreadsheet({
       format,
       label: `Format ${label}`,
     };
-    const nextWorkbook = dispatchCommand(workbookRef.current, command);
-    workbookRef.current = nextWorkbook;
-    setWorkbook(nextWorkbook);
+    const result = dispatchWorkbookCommand(command, {}, {source: 'format'});
+    const nextWorkbook = result.workbook;
     onCellChange?.({selection, format, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
-    emitWorkbookChange(nextWorkbook, {source: 'format', command});
     setDataVersion((v) => v + 1);
     showToast(`Formatted ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)} as ${label}`);
-  }, [activeCell, committedSelection, emitWorkbookChange, onCellChange, showToast]);
+  }, [activeCell, committedSelection, dispatchWorkbookCommand, onCellChange, showToast]);
+  const styleSelection = useCallback((style, label) => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    const command = {
+      type: CommandType.SET_RANGE_STYLE,
+      range: selection,
+      style,
+      label: `Style ${label}`,
+    };
+    const result = dispatchWorkbookCommand(command, {}, {source: 'style'});
+    const nextWorkbook = result.workbook;
+    onCellChange?.({selection, style, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
+    setDataVersion((v) => v + 1);
+    showToast(`Styled ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)} as ${label}`);
+  }, [activeCell, committedSelection, dispatchWorkbookCommand, onCellChange, showToast]);
   const sortSelection = useCallback((direction) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     if (selection.r2 <= selection.r1) {
@@ -489,15 +544,12 @@ export function Spreadsheet({
       sortBy: [{col: sortCol, direction, type: 'auto'}],
       label: direction === 'asc' ? 'Sort ascending' : 'Sort descending',
     };
-    const result = dispatchCommandWithRecalculation(workbookRef.current, command, {getDefaultCellValue});
-    workbookRef.current = result.workbook;
-    setWorkbook(result.workbook);
+    const result = dispatchWorkbookCommand(command, {getDefaultCellValue}, {source: 'sort'});
     setDataVersion((v) => v + 1);
     syncFormulaDraftFromWorkbook(result.workbook);
     onCellChange?.({selection, sort: {col: sortCol, direction}, cells: getActiveSheet(result.workbook).cells, workbook: result.workbook, recalculated: result.recalculated});
-    emitWorkbookChange(result.workbook, {source: 'sort', command, recalculated: result.recalculated});
     showToast(direction === 'asc' ? 'Sorted ascending' : 'Sorted descending');
-  }, [activeCell, committedSelection, emitWorkbookChange, getDefaultCellValue, onCellChange, showToast, syncFormulaDraftFromWorkbook]);
+  }, [activeCell, committedSelection, dispatchWorkbookCommand, getDefaultCellValue, onCellChange, showToast, syncFormulaDraftFromWorkbook]);
   const filterSelectionByActiveValue = useCallback(() => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     if (selection.r2 <= selection.r1) {
@@ -514,28 +566,24 @@ export function Spreadsheet({
       criteria: [{col: filterCol, operator: 'equals', value}],
       label: 'Filter selection',
     };
-    const nextWorkbook = dispatchCommand(workbookRef.current, command);
-    workbookRef.current = nextWorkbook;
-    setWorkbook(nextWorkbook);
+    const result = dispatchWorkbookCommand(command, {}, {source: 'filter'});
+    const nextWorkbook = result.workbook;
     setDimensionVersion((v) => v + 1);
     onCellChange?.({selection, filter: command, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
-    emitWorkbookChange(nextWorkbook, {source: 'filter', command});
     showToast(`Filtered ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`);
-  }, [activeCell, activeSheet.id, committedSelection, emitWorkbookChange, getDefaultCellValue, onCellChange, showToast]);
+  }, [activeCell, activeSheet.id, committedSelection, dispatchWorkbookCommand, getDefaultCellValue, onCellChange, showToast]);
   const clearActiveFilter = useCallback(() => {
     if (!activeSheet.filters.size) {
       showToast('No active filter', 'error');
       return;
     }
     const command = {type: CommandType.CLEAR_FILTER, id: 'selection-filter', label: 'Clear filter'};
-    const nextWorkbook = dispatchCommand(workbookRef.current, command);
-    workbookRef.current = nextWorkbook;
-    setWorkbook(nextWorkbook);
+    const result = dispatchWorkbookCommand(command, {}, {source: 'filter'});
+    const nextWorkbook = result.workbook;
     setDimensionVersion((v) => v + 1);
     onCellChange?.({filter: null, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
-    emitWorkbookChange(nextWorkbook, {source: 'filter', command});
     showToast('Cleared filter');
-  }, [activeSheet.filters.size, emitWorkbookChange, onCellChange, showToast]);
+  }, [activeSheet.filters.size, dispatchWorkbookCommand, onCellChange, showToast]);
   const mergeSelection = useCallback(() => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     if (selection.r1 === selection.r2 && selection.c1 === selection.c2) {
@@ -635,6 +683,70 @@ export function Spreadsheet({
       label: 'Clear validation',
     }, 'Cleared validation', 'metadata');
   }, [activeCell, activeSheet, committedSelection, commitWorkbookStructureCommand, showToast]);
+  const highlightGreaterThan = useCallback(() => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    const input = typeof window === 'undefined' ? '0' : window.prompt('Highlight values greater than', '0');
+    if (input == null) return;
+    const value = normalizePromptNumber(input);
+    if (value == null || Number.isNaN(value)) {
+      showToast('Highlight threshold must be a number', 'error');
+      return;
+    }
+    const rangeLabel = `${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`;
+    commitWorkbookStructureCommand({
+      type: CommandType.SET_CONDITIONAL_FORMAT,
+      rule: {
+        range: selection,
+        type: ConditionalFormatType.NUMBER,
+        operator: 'gt',
+        value,
+        style: {backgroundColor: '#d1fae5', color: '#064e3b', fontWeight: 600},
+      },
+      label: `Highlight ${rangeLabel}`,
+    }, `Highlighted values above ${value}`, 'metadata');
+  }, [activeCell, committedSelection, commitWorkbookStructureCommand, showToast]);
+  const highlightTextContains = useCallback(() => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    const input = typeof window === 'undefined' ? '' : window.prompt('Highlight text containing', '');
+    if (input == null) return;
+    const value = input.trim();
+    if (!value) {
+      showToast('Enter text to highlight', 'error');
+      return;
+    }
+    const rangeLabel = `${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`;
+    commitWorkbookStructureCommand({
+      type: CommandType.SET_CONDITIONAL_FORMAT,
+      rule: {
+        range: selection,
+        type: ConditionalFormatType.TEXT,
+        operator: 'contains',
+        value,
+        style: {backgroundColor: '#fee2e2', color: '#7f1d1d', fontWeight: 600},
+      },
+      label: `Highlight text ${rangeLabel}`,
+    }, `Highlighted text matches in ${rangeLabel}`, 'metadata');
+  }, [activeCell, committedSelection, commitWorkbookStructureCommand, showToast]);
+  const clearConditionalFormat = useCallback(() => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    const exactRule = Array.from(activeSheet.conditionalFormats.values()).find((rule) => (
+      rule.range.r1 === selection.r1 &&
+      rule.range.c1 === selection.c1 &&
+      rule.range.r2 === selection.r2 &&
+      rule.range.c2 === selection.c2
+    ));
+    const activeRule = getConditionalFormatRulesForCell(activeSheet, activeCell.row, activeCell.col)[0];
+    const rule = exactRule || activeRule;
+    if (!rule) {
+      showToast('No conditional format at active cell', 'error');
+      return;
+    }
+    commitWorkbookStructureCommand({
+      type: CommandType.CLEAR_CONDITIONAL_FORMAT,
+      id: rule.id,
+      label: 'Clear conditional format',
+    }, 'Cleared conditional format', 'metadata');
+  }, [activeCell, activeSheet, committedSelection, commitWorkbookStructureCommand, showToast]);
   const nameSelection = useCallback(() => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     const input = typeof window === 'undefined' ? defaultRangeName(selection) : window.prompt('Named range', defaultRangeName(selection));
@@ -672,22 +784,86 @@ export function Spreadsheet({
       label: `Remove ${name}`,
     }, `Removed named range ${name}`, 'metadata');
   }, [commitWorkbookStructureCommand, showToast]);
+  const editCellLink = useCallback((row, col) => {
+    const currentCell = getCellRecord(workbookRef.current, activeSheet.id, row, col);
+    const input = typeof window === 'undefined' ? currentCell?.link?.href || '' : window.prompt('Cell link', currentCell?.link?.href || '');
+    if (input == null) return;
+    const href = normalizeLinkInput(input);
+    const command = href
+      ? currentCell || getCellRawValue(workbookRef.current, activeSheet.id, row, col, {getDefaultCellValue})
+        ? {type: CommandType.SET_CELL_LINK, row, col, href, label: 'Set cell link'}
+        : {
+            type: CommandType.BATCH,
+            commands: [
+              {type: CommandType.SET_CELL, row, col, value: href},
+              {type: CommandType.SET_CELL_LINK, row, col, href},
+            ],
+            label: 'Set cell link',
+          }
+      : {type: CommandType.CLEAR_CELL_LINK, row, col, label: 'Clear cell link'};
+    commitWorkbookStructureCommand(command, href ? `Added link to ${cellAddress(row, col)}` : `Cleared link in ${cellAddress(row, col)}`, 'metadata');
+  }, [activeSheet.id, commitWorkbookStructureCommand, getDefaultCellValue]);
+  const clearCellLink = useCallback((row, col) => {
+    const currentLink = getCellRecord(workbookRef.current, activeSheet.id, row, col)?.link?.href;
+    if (!currentLink) {
+      showToast('No link at active cell', 'error');
+      return;
+    }
+    commitWorkbookStructureCommand({
+      type: CommandType.CLEAR_CELL_LINK,
+      row,
+      col,
+      label: 'Clear cell link',
+    }, `Cleared link in ${cellAddress(row, col)}`, 'metadata');
+  }, [activeSheet.id, commitWorkbookStructureCommand, showToast]);
+  const openCellLink = useCallback((row, col) => {
+    const href = getCellRecord(workbookRef.current, activeSheet.id, row, col)?.link?.href;
+    if (!href) {
+      showToast('No link at active cell', 'error');
+      return;
+    }
+    if (typeof window === 'undefined' || !isOpenableLink(href)) {
+      showToast('Link cannot be opened', 'error');
+      return;
+    }
+    window.open(href, '_blank', 'noopener,noreferrer');
+  }, [activeSheet.id, showToast]);
+  const editCellNote = useCallback((row, col) => {
+    const currentNote = getCellRecord(workbookRef.current, activeSheet.id, row, col)?.note || '';
+    const input = typeof window === 'undefined' ? currentNote : window.prompt('Cell note', currentNote);
+    if (input == null) return;
+    const note = input.trim();
+    commitWorkbookStructureCommand({
+      type: note ? CommandType.SET_CELL_NOTE : CommandType.CLEAR_CELL_NOTE,
+      row,
+      col,
+      note,
+      label: note ? 'Set cell note' : 'Clear cell note',
+    }, note ? `Added note to ${cellAddress(row, col)}` : `Cleared note in ${cellAddress(row, col)}`, 'metadata');
+  }, [activeSheet.id, commitWorkbookStructureCommand]);
+  const clearCellNote = useCallback((row, col) => {
+    const currentNote = getCellRecord(workbookRef.current, activeSheet.id, row, col)?.note;
+    if (!currentNote) {
+      showToast('No note at active cell', 'error');
+      return;
+    }
+    commitWorkbookStructureCommand({
+      type: CommandType.CLEAR_CELL_NOTE,
+      row,
+      col,
+      label: 'Clear cell note',
+    }, `Cleared note in ${cellAddress(row, col)}`, 'metadata');
+  }, [activeSheet.id, commitWorkbookStructureCommand, showToast]);
   const resizeColumn = useCallback((col, size) => {
     const command = {type: CommandType.RESIZE_COLUMN, col, size};
-    const nextWorkbook = dispatchCommand(workbookRef.current, command);
-    workbookRef.current = nextWorkbook;
-    setWorkbook(nextWorkbook);
-    emitWorkbookChange(nextWorkbook, {source: 'resize', command});
+    dispatchWorkbookCommand(command, {}, {source: 'resize'});
     setDimensionVersion((v) => v + 1);
-  }, [emitWorkbookChange]);
+  }, [dispatchWorkbookCommand]);
   const resizeRow = useCallback((row, size) => {
     const command = {type: CommandType.RESIZE_ROW, row, size};
-    const nextWorkbook = dispatchCommand(workbookRef.current, command);
-    workbookRef.current = nextWorkbook;
-    setWorkbook(nextWorkbook);
-    emitWorkbookChange(nextWorkbook, {source: 'resize', command});
+    dispatchWorkbookCommand(command, {}, {source: 'resize'});
     setDimensionVersion((v) => v + 1);
-  }, [emitWorkbookChange]);
+  }, [dispatchWorkbookCommand]);
   const resetCellDimensions = useCallback((row, col) => {
     const currentWorkbook = workbookRef.current;
     const currentSheet = getActiveSheet(currentWorkbook);
@@ -696,12 +872,57 @@ export function Spreadsheet({
     if (currentSheet.colWidths.has(col)) commands.push({type: CommandType.RESIZE_COLUMN, col, size: null});
     if (currentSheet.rowHeights.has(row)) commands.push({type: CommandType.RESIZE_ROW, row, size: null});
     const command = commands.length === 1 ? commands[0] : {type: CommandType.BATCH, commands, label: 'Reset dimensions'};
-    const nextWorkbook = dispatchCommand(currentWorkbook, command);
-    workbookRef.current = nextWorkbook;
-    setWorkbook(nextWorkbook);
-    emitWorkbookChange(nextWorkbook, {source: 'resize', command});
+    dispatchWorkbookCommand(command, {}, {source: 'resize'});
     setDimensionVersion((v) => v + 1);
-  }, [emitWorkbookChange]);
+  }, [dispatchWorkbookCommand]);
+  const applyStructuralCommand = useCallback((command, message) => {
+    const result = dispatchWorkbookCommand(command, {getDefaultCellValue}, {source: 'structure'});
+    setDataVersion((v) => v + 1);
+    setDimensionVersion((v) => v + 1);
+    syncFormulaDraftFromWorkbook(result.workbook);
+    showToast(message);
+    return result.workbook;
+  }, [dispatchWorkbookCommand, getDefaultCellValue, showToast, syncFormulaDraftFromWorkbook]);
+  const insertRowAt = useCallback((row, placement = 'above') => {
+    const index = placement === 'below' ? row + 1 : row;
+    applyStructuralCommand({type: CommandType.INSERT_ROWS, index, count: 1, label: placement === 'below' ? 'Insert row below' : 'Insert row above'}, placement === 'below' ? 'Inserted row below' : 'Inserted row above');
+  }, [applyStructuralCommand]);
+  const deleteRowAt = useCallback((row) => {
+    applyStructuralCommand({type: CommandType.DELETE_ROWS, index: row, count: 1, label: 'Delete row'}, `Deleted row ${row + 1}`);
+  }, [applyStructuralCommand]);
+  const insertColumnAt = useCallback((col, placement = 'left') => {
+    const index = placement === 'right' ? col + 1 : col;
+    applyStructuralCommand({type: CommandType.INSERT_COLUMNS, index, count: 1, label: placement === 'right' ? 'Insert column right' : 'Insert column left'}, placement === 'right' ? 'Inserted column right' : 'Inserted column left');
+  }, [applyStructuralCommand]);
+  const deleteColumnAt = useCallback((col) => {
+    applyStructuralCommand({type: CommandType.DELETE_COLUMNS, index: col, count: 1, label: 'Delete column'}, `Deleted column ${columnName(col)}`);
+  }, [applyStructuralCommand]);
+  const fillSelectionDown = useCallback(() => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    if (selection.r2 <= selection.r1) {
+      showToast('Select at least two rows to fill down', 'error');
+      return;
+    }
+    const command = createFillDownCommand(workbookRef.current, selection, {getDefaultCellValue});
+    const result = dispatchWorkbookCommand(command, {getDefaultCellValue}, {source: 'fill'});
+    setDataVersion((v) => v + 1);
+    syncFormulaDraftFromWorkbook(result.workbook);
+    onCellChange?.({selection, fill: 'down', cells: getActiveSheet(result.workbook).cells, workbook: result.workbook, recalculated: result.recalculated});
+    showToast(`Filled down ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`);
+  }, [activeCell, committedSelection, dispatchWorkbookCommand, getDefaultCellValue, onCellChange, showToast, syncFormulaDraftFromWorkbook]);
+  const fillSelectionRight = useCallback(() => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    if (selection.c2 <= selection.c1) {
+      showToast('Select at least two columns to fill right', 'error');
+      return;
+    }
+    const command = createFillRightCommand(workbookRef.current, selection, {getDefaultCellValue});
+    const result = dispatchWorkbookCommand(command, {getDefaultCellValue}, {source: 'fill'});
+    setDataVersion((v) => v + 1);
+    syncFormulaDraftFromWorkbook(result.workbook);
+    onCellChange?.({selection, fill: 'right', cells: getActiveSheet(result.workbook).cells, workbook: result.workbook, recalculated: result.recalculated});
+    showToast(`Filled right ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`);
+  }, [activeCell, committedSelection, dispatchWorkbookCommand, getDefaultCellValue, onCellChange, showToast, syncFormulaDraftFromWorkbook]);
 
   useLayoutEffect(() => { calculateView(); drawSelectionOverlay(); }, [calculateView, drawSelectionOverlay, dimensionVersion, size.width, size.height]);
   useEffect(() => {
@@ -722,6 +943,9 @@ export function Spreadsheet({
           row: rowMetrics.indexAt(Math.max(0, event.clientY - rect.top + scrollRef.current.top)),
           col: colMetrics.indexAt(Math.max(0, event.clientX - rect.left + scrollRef.current.left)),
         };
+        if (selectionRef.current.mode === 'formula-reference') {
+          applyFormulaReferenceSelection(normalizeSelection(selectionRef.current.anchor, selectionRef.current.extent));
+        }
         scheduleDrawSelection();
         return;
       }
@@ -752,7 +976,12 @@ export function Spreadsheet({
     const onPointerUp = () => {
       if (selectionRef.current.dragging) {
         selectionRef.current.dragging = false;
-        setCommittedSelection(normalizeSelection(selectionRef.current.anchor, selectionRef.current.extent));
+        const selection = normalizeSelection(selectionRef.current.anchor, selectionRef.current.extent);
+        setCommittedSelection(selection);
+        if (selectionRef.current.mode === 'formula-reference') {
+          applyFormulaReferenceSelection(selection);
+          formulaReferenceEditRef.current = null;
+        }
       }
       if (resizeRef.current) {
         const r = resizeRef.current;
@@ -773,7 +1002,7 @@ export function Spreadsheet({
     window.addEventListener('pointermove', onPointerMove, {passive: true});
     window.addEventListener('pointerup', onPointerUp);
     return () => { window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp); };
-  }, [rowMetrics, colMetrics, scheduleDrawSelection, scheduleDimensionRender, headerHeight, sidebarWidth, setCommittedSelection, resizeColumn, resizeRow]);
+  }, [rowMetrics, colMetrics, scheduleDrawSelection, scheduleDimensionRender, headerHeight, sidebarWidth, setCommittedSelection, resizeColumn, resizeRow, applyFormulaReferenceSelection]);
   useEffect(() => {
     const close = () => setMenu((m) => ({...m, open: false}));
     window.addEventListener('pointerdown', close);
@@ -813,27 +1042,47 @@ export function Spreadsheet({
     if (event.button !== 0) return;
     event.preventDefault();
     const point = clampPoint({row, col}, gridConfig);
+    if (formulaEditorActive && String(formulaDraft ?? '').trim().startsWith('=')) {
+      const selection = normalizeSelection(point, point);
+      const cursorPosition = formulaCursorPosition || String(formulaDraft ?? '').length;
+      formulaReferenceEditRef.current = {baseDraft: formulaDraft, cursorPosition};
+      selectionRef.current = {dragging: true, anchor: point, extent: point, mode: 'formula-reference'};
+      setCommittedSelection(selection);
+      applyFormulaReferenceSelection(selection, formulaReferenceEditRef.current);
+      setEditor(null);
+      setMenu((m) => ({...m, open: false}));
+      setFormulaPickerOpen(false);
+      scheduleDrawSelection();
+      return;
+    }
     selectionRef.current = {dragging: true, anchor: point, extent: point};
     setActiveCell(point);
     setCommittedSelection(normalizeSelection(point, point));
     setFormulaDraft(readCell(cellDataRef, point.row, point.col, getDefaultCellValue));
+    setFormulaEditorActive(false);
+    formulaReferenceEditRef.current = null;
     setEditor(null);
     setMenu((m) => ({...m, open: false}));
     setFormulaPickerOpen(false);
     scheduleDrawSelection();
-  }, [cellDataRef, gridConfig, getDefaultCellValue, setActiveCell, setCommittedSelection, scheduleDrawSelection]);
+  }, [cellDataRef, formulaCursorPosition, formulaDraft, formulaEditorActive, gridConfig, getDefaultCellValue, setActiveCell, setCommittedSelection, scheduleDrawSelection, applyFormulaReferenceSelection]);
   const openContextMenu = useCallback((event, row, col) => {
     event.preventDefault(); event.stopPropagation();
     const point = clampPoint({row, col}, gridConfig);
-    selectionRef.current = {dragging: false, anchor: point, extent: point};
+    const keepSelection = committedSelection && point.row >= committedSelection.r1 && point.row <= committedSelection.r2 && point.col >= committedSelection.c1 && point.col <= committedSelection.c2;
+    if (!keepSelection) {
+      selectionRef.current = {dragging: false, anchor: point, extent: point};
+      setCommittedSelection(normalizeSelection(point, point));
+    } else {
+      selectionRef.current = {dragging: false, anchor: {row: committedSelection.r1, col: committedSelection.c1}, extent: {row: committedSelection.r2, col: committedSelection.c2}};
+    }
     setActiveCell(point);
-    setCommittedSelection(normalizeSelection(point, point));
     setFormulaDraft(readCell(cellDataRef, point.row, point.col, getDefaultCellValue));
     scheduleDrawSelection();
     const x = Math.min(event.clientX, window.innerWidth - 228);
-    const y = Math.min(event.clientY, window.innerHeight - 310);
+    const y = Math.min(event.clientY, window.innerHeight - 430);
     setMenu({open: true, x: Math.max(4, x), y: Math.max(4, y), row: point.row, col: point.col});
-  }, [cellDataRef, gridConfig, getDefaultCellValue, setActiveCell, setCommittedSelection, scheduleDrawSelection]);
+  }, [cellDataRef, committedSelection, gridConfig, getDefaultCellValue, setActiveCell, setCommittedSelection, scheduleDrawSelection]);
   const onViewportContextMenu = useCallback((event) => {
     if (event.target?.classList?.contains('cell')) return;
     const rect = viewportRef.current.getBoundingClientRect();
@@ -844,16 +1093,43 @@ export function Spreadsheet({
   const commitFormula = useCallback(() => {
     if (setCell(activeCell.row, activeCell.col, formulaDraft)) showToast(`Updated ${cellAddress(activeCell.row, activeCell.col)}`);
   }, [activeCell, formulaDraft, setCell, showToast]);
-  const insertFunction = useCallback((name) => {
+  const formulaContext = useMemo(() => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     const range = `${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`;
-    const value = name === 'ARITH' ? `=${cellAddress(activeCell.row, Math.max(0, activeCell.col - 1))}+${cellAddress(activeCell.row, Math.max(0, activeCell.col - 2))}` : `=${name}(${range})`;
+    return {
+      sheetId: activeSheet.id,
+      sheets: workbook.sheetOrder.map((sheetId) => workbook.sheets.get(sheetId)).filter(Boolean).map((sheet) => ({id: sheet.id, name: sheet.name})),
+      namedRanges: listNamedRanges(workbook),
+      range,
+      firstCell: cellAddress(selection.r1, selection.c1),
+      lastCell: cellAddress(selection.r2, selection.c2),
+      firstColumnRange: `${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c1)}`,
+      lastColumnRange: `${cellAddress(selection.r1, selection.c2)}:${cellAddress(selection.r2, selection.c2)}`,
+      lastColumnIndex: Math.max(1, selection.c2 - selection.c1 + 1),
+      rowCount: selection.r2 - selection.r1 + 1,
+    };
+  }, [activeCell, activeSheet.id, committedSelection, workbook]);
+  const buildFormulaTemplate = useCallback((name) => {
+    return name === 'ARITH'
+      ? `=${cellAddress(activeCell.row, Math.max(0, activeCell.col - 1))}+${cellAddress(activeCell.row, Math.max(0, activeCell.col - 2))}`
+      : createFormulaTemplate(name, formulaContext);
+  }, [activeCell, formulaContext]);
+  const draftFunctionTemplate = useCallback((name) => {
+    if (!name) return;
+    setFormulaDraft(buildFormulaTemplate(name));
+  }, [buildFormulaTemplate]);
+  const insertFunction = useCallback((name) => {
+    if (!name) {
+      setFormulaPickerOpen(false);
+      return;
+    }
+    const value = buildFormulaTemplate(name);
     setFormulaDraft(value);
     if (setCell(activeCell.row, activeCell.col, value)) {
       setFormulaPickerOpen(false);
       showToast(`Inserted ${name === 'ARITH' ? 'formula' : name} in ${cellAddress(activeCell.row, activeCell.col)}`);
     }
-  }, [committedSelection, activeCell, setCell, showToast]);
+  }, [activeCell, buildFormulaTemplate, setCell, showToast]);
   const handleMenuAction = useCallback((action) => {
     const {row, col} = menu;
     if (action === 'edit') openEditor(row, col);
@@ -863,9 +1139,22 @@ export function Spreadsheet({
     }
     if (action === 'copy') navigator.clipboard?.writeText(readCell(cellDataRef, row, col, getDefaultCellValue)).then(() => showToast('Copied value'), () => showToast('Clipboard blocked', 'error'));
     if (action === 'address') navigator.clipboard?.writeText(cellAddress(row, col)).then(() => showToast('Copied address'), () => showToast('Clipboard blocked', 'error'));
+    if (action === 'link') editCellLink(row, col);
+    if (action === 'openLink') openCellLink(row, col);
+    if (action === 'clearLink') clearCellLink(row, col);
+    if (action === 'note') editCellNote(row, col);
+    if (action === 'clearNote') clearCellNote(row, col);
+    if (action === 'fillDown') fillSelectionDown();
+    if (action === 'fillRight') fillSelectionRight();
     if (action === 'widen') resizeColumn(col, colMetrics.size(col) + 20);
     if (action === 'taller') resizeRow(row, rowMetrics.size(row) + 6);
     if (action === 'resetSize') resetCellDimensions(row, col);
+    if (action === 'insertRowAbove') insertRowAt(row, 'above');
+    if (action === 'insertRowBelow') insertRowAt(row, 'below');
+    if (action === 'deleteRow') deleteRowAt(row);
+    if (action === 'insertColumnLeft') insertColumnAt(col, 'left');
+    if (action === 'insertColumnRight') insertColumnAt(col, 'right');
+    if (action === 'deleteColumn') deleteColumnAt(col);
     if (action === 'sample') {
       const value = `=SUM(B${row + 1}:E${row + 1})`;
       if (setCell(row, col, value)) {
@@ -874,7 +1163,7 @@ export function Spreadsheet({
       }
     }
     setMenu((m) => ({...m, open: false}));
-  }, [menu, openEditor, activeCell, showToast, colMetrics, rowMetrics, setCell, cellDataRef, getDefaultCellValue, resetCellDimensions, resizeColumn, resizeRow]);
+  }, [menu, openEditor, activeCell, showToast, colMetrics, rowMetrics, setCell, cellDataRef, getDefaultCellValue, editCellLink, openCellLink, clearCellLink, editCellNote, clearCellNote, fillSelectionDown, fillSelectionRight, resetCellDimensions, resizeColumn, resizeRow, insertRowAt, deleteRowAt, insertColumnAt, deleteColumnAt]);
 
   const rows = useMemo(() => Array.from({length: Math.max(0, view.rowEnd - view.rowStart + 1)}, (_, i) => view.rowStart + i), [view.rowStart, view.rowEnd]);
   const renderedRows = useMemo(() => filteredRows?.hiddenRows?.length ? rows.filter((row) => rowMetrics.size(row) > 0) : rows, [filteredRows, rowMetrics, rows]);
@@ -884,6 +1173,24 @@ export function Spreadsheet({
   const totalWidth = colMetrics.total();
   const totalHeight = rowMetrics.total();
   const activeAddress = cellAddress(activeCell.row, activeCell.col);
+  const formulaPreview = useMemo(() => previewFormulaDraft(
+    workbook,
+    activeSheet.id,
+    activeCell.row,
+    activeCell.col,
+    formulaDraft,
+    {getDefaultCellValue},
+  ), [activeCell.col, activeCell.row, activeSheet.id, formulaDraft, getDefaultCellValue, workbook]);
+  const formulaReferenceHighlights = useMemo(() => {
+    if (!formulaEditorActive || !String(formulaDraft ?? '').trimStart().startsWith('=')) return [];
+    return getFormulaEditorReferenceHighlights(formulaDraft, {
+      ...formulaContext,
+      sheetName: activeSheet.name,
+      sheetRowCount: rowCount,
+      sheetColCount: colCount,
+      getSpillRangeForCell: (_sheetName, row, col) => getCellSpillRange(activeSheet, row, col),
+    });
+  }, [activeSheet, colCount, formulaContext, formulaDraft, formulaEditorActive, rowCount]);
   const editorStyle = editor ? {left: colMetrics.offset(editor.col), top: rowMetrics.offset(editor.row), width: colMetrics.size(editor.col), height: rowMetrics.size(editor.row)} : {};
   const appClassName = [
     'app',
@@ -902,10 +1209,15 @@ export function Spreadsheet({
           subtitle={subtitle}
           activeAddress={activeAddress}
           formulaDraft={formulaDraft}
+          formulaPreview={formulaPreview}
+          formulaCursorPosition={formulaCursorPosition}
           onFormulaChange={setFormulaDraft}
           onFormulaCommit={commitFormula}
           onFormulaReset={() => setFormulaDraft(readCell(cellDataRef, activeCell.row, activeCell.col, getDefaultCellValue))}
           onToggleFunctionPicker={() => setFormulaPickerOpen((v) => !v)}
+          onFormulaFocusChange={setFormulaEditorActive}
+          onFormulaCursorChange={setFormulaCursorPosition}
+          formulaContext={formulaContext}
           rowCount={rowCount}
           colCount={colCount}
           mountedCount={renderedRows.length * columns.length}
@@ -921,6 +1233,10 @@ export function Spreadsheet({
           onFormatCurrency={() => formatSelection({type: NumberFormatType.CURRENCY, currency: 'USD', decimals: 2}, 'currency')}
           onFormatPercent={() => formatSelection({type: NumberFormatType.PERCENT, decimals: 1}, 'percent')}
           onFormatDate={() => formatSelection({type: NumberFormatType.DATE}, 'date')}
+          onStyleBold={() => styleSelection({fontWeight: 700}, 'bold')}
+          onStyleBorder={() => styleSelection({border: '1px solid #64748b'}, 'border')}
+          onStyleFill={() => styleSelection({backgroundColor: '#e0f2fe'}, 'fill')}
+          onStyleText={() => styleSelection({color: '#075985'}, 'text color')}
           onSortAscending={() => sortSelection('asc')}
           onSortDescending={() => sortSelection('desc')}
           onFilterSelection={filterSelectionByActiveValue}
@@ -930,6 +1246,9 @@ export function Spreadsheet({
           onValidateNumber={applyNumberValidation}
           onValidateList={applyListValidation}
           onClearValidation={clearValidation}
+          onHighlightGreaterThan={highlightGreaterThan}
+          onHighlightTextContains={highlightTextContains}
+          onClearConditionalFormat={clearConditionalFormat}
           onNameSelection={nameSelection}
           onRemoveNamedRange={removeNamedRange}
           onWidenActiveColumn={() => resizeColumn(activeCell.col, colMetrics.size(activeCell.col) + 20)}
@@ -948,7 +1267,17 @@ export function Spreadsheet({
           showKeyboardHints={showKeyboardHints}
         />
       ) : null}
-      {showToolbar ? <FunctionPicker open={formulaPickerOpen} activeAddress={activeAddress} formulaDraft={formulaDraft} selection={committedSelection} onPick={insertFunction} /> : null}
+      {showToolbar ? (
+        <FunctionPicker
+          open={formulaPickerOpen}
+          activeAddress={activeAddress}
+          formulaDraft={formulaDraft}
+          selection={committedSelection}
+          onPick={insertFunction}
+          onDraft={draftFunctionTemplate}
+          onClose={() => setFormulaPickerOpen(false)}
+        />
+      ) : null}
       <main className="stage">
         <div className="sheet-workbench">
           <Card className="sheet-shell" padding={0}>
@@ -991,6 +1320,22 @@ export function Spreadsheet({
                     />
                   ))}
                 </div>
+                {formulaReferenceHighlights.length ? (
+                  <div className="formula-reference-layer" aria-hidden="true">
+                    {formulaReferenceHighlights.map((item, index) => (
+                      <div
+                        key={`${item.reference}-${index}`}
+                        className={`formula-reference-overlay color-${item.color || 'blue'}`}
+                        style={{
+                          left: colMetrics.offset(item.range.c1),
+                          top: rowMetrics.offset(item.range.r1),
+                          width: colMetrics.span(item.range.c1, item.range.c2),
+                          height: rowMetrics.span(item.range.r1, item.range.r2),
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : null}
                 <div ref={selectionOverlayRef} className="selection-overlay"><div className="fill-handle" /></div>
                 {editor && <input ref={editorRef} className="cell-input" style={editorStyle} value={editor.value} onChange={(e) => setEditor((ed) => ({...ed, value: e.target.value}))} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Enter') commitEditor(e.currentTarget.value); if (e.key === 'Escape') setEditor(null); }} onBlur={(e) => commitEditor(e.currentTarget.value)} />}
               </div>

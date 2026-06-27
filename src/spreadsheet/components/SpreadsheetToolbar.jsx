@@ -1,42 +1,45 @@
 import React from 'react';
-import {Button} from '@astryxdesign/core/Button';
-import {Badge} from '@astryxdesign/core/Badge';
-import {TextInput} from '@astryxdesign/core/TextInput';
 import {Text} from '@astryxdesign/core/Text';
 import {Heading} from '@astryxdesign/core/Heading';
 import {Switch} from '@astryxdesign/core/Switch';
 import {Selector} from '@astryxdesign/core/Selector';
 import {Token} from '@astryxdesign/core/Token';
 import {Kbd} from '@astryxdesign/core/Kbd';
-import {Tooltip} from '@astryxdesign/core/Tooltip';
 import {
   ArrowDownAZ,
   ArrowUpZA,
+  Bold,
   CalendarDays,
   ClipboardPaste,
   Combine,
   Contrast,
   Copy,
+  BrushCleaning,
   DollarSign,
   Eraser,
   Filter,
   FilterX,
   Hash,
+  Highlighter,
   ListChecks,
   ListX,
   Moon,
   Pencil,
   Percent,
+  PaintBucket,
   Redo2,
   Rows3,
   Split,
+  Square,
   Tag,
   TagX,
+  Type,
   Undo2,
   UnfoldHorizontal,
   UnfoldVertical,
 } from 'lucide-react';
 import {THEME_OPTIONS} from '../../app/themes.js';
+import {FormulaEditor} from './FormulaEditor.jsx';
 
 const iconProps = {size: 16, strokeWidth: 2, 'aria-hidden': true};
 
@@ -73,10 +76,15 @@ export function SpreadsheetToolbar({
   subtitle,
   activeAddress,
   formulaDraft,
+  formulaPreview,
+  formulaCursorPosition,
   onFormulaChange,
   onFormulaCommit,
   onFormulaReset,
   onToggleFunctionPicker,
+  onFormulaFocusChange,
+  onFormulaCursorChange,
+  formulaContext,
   rowCount,
   colCount,
   mountedCount,
@@ -92,6 +100,10 @@ export function SpreadsheetToolbar({
   onFormatCurrency,
   onFormatPercent,
   onFormatDate,
+  onStyleBold,
+  onStyleBorder,
+  onStyleFill,
+  onStyleText,
   onSortAscending,
   onSortDescending,
   onFilterSelection,
@@ -101,6 +113,9 @@ export function SpreadsheetToolbar({
   onValidateNumber,
   onValidateList,
   onClearValidation,
+  onHighlightGreaterThan,
+  onHighlightTextContains,
+  onClearConditionalFormat,
   onNameSelection,
   onRemoveNamedRange,
   onWidenActiveColumn,
@@ -133,17 +148,18 @@ export function SpreadsheetToolbar({
         <span className="ribbon-tab">View</span>
       </div>
       <div className="formula-wrap">
-        <Badge variant="purple" label={activeAddress} />
-        <Tooltip content="Insert a formula from the current selection"><Button label="fx" variant="secondary" size="sm" onClick={onToggleFunctionPicker} /></Tooltip>
-        <TextInput
-          label="Formula bar"
-          isLabelHidden
-          value={formulaDraft}
-          onChange={onFormulaChange}
-          onEnter={onFormulaCommit}
-          onKeyDown={(e) => { if (e.key === 'Escape') onFormulaReset(); }}
-          onBlur={onFormulaCommit}
-          width="100%"
+        <FormulaEditor
+          activeAddress={activeAddress}
+          formulaDraft={formulaDraft}
+          formulaPreview={formulaPreview}
+          formulaCursorPosition={formulaCursorPosition}
+          formulaContext={formulaContext}
+          onFormulaChange={onFormulaChange}
+          onFormulaCommit={onFormulaCommit}
+          onFormulaReset={onFormulaReset}
+          onToggleFunctionPicker={onToggleFunctionPicker}
+          onFormulaFocusChange={onFormulaFocusChange}
+          onFormulaCursorChange={onFormulaCursorChange}
         />
       </div>
       {showStats ? (
@@ -170,6 +186,12 @@ export function SpreadsheetToolbar({
           <RibbonButton label="Percent" icon={icon(Percent)} onClick={onFormatPercent}>Percent</RibbonButton>
           <RibbonButton label="Date" icon={icon(CalendarDays)} onClick={onFormatDate} />
         </RibbonGroup>
+        <RibbonGroup label="Style">
+          <RibbonButton label="Bold" icon={icon(Bold)} onClick={onStyleBold} />
+          <RibbonButton label="Border" icon={icon(Square)} onClick={onStyleBorder} />
+          <RibbonButton label="Fill" icon={icon(PaintBucket)} onClick={onStyleFill} />
+          <RibbonButton label="Text color" icon={icon(Type)} onClick={onStyleText}>Text</RibbonButton>
+        </RibbonGroup>
         <RibbonGroup label="Data">
           <RibbonButton label="Sort A-Z" icon={icon(ArrowDownAZ)} onClick={onSortAscending} />
           <RibbonButton label="Sort Z-A" icon={icon(ArrowUpZA)} onClick={onSortDescending} />
@@ -186,6 +208,9 @@ export function SpreadsheetToolbar({
           <RibbonButton label="Number rule" icon={icon(ListChecks)} onClick={onValidateNumber}>Number</RibbonButton>
           <RibbonButton label="List rule" icon={icon(Rows3)} onClick={onValidateList}>List</RibbonButton>
           <RibbonButton label="Clear rule" icon={icon(ListX)} onClick={onClearValidation}>Clear</RibbonButton>
+          <RibbonButton label="Highlight greater than" icon={icon(Highlighter)} onClick={onHighlightGreaterThan}>Greater</RibbonButton>
+          <RibbonButton label="Highlight text" icon={icon(Highlighter)} onClick={onHighlightTextContains}>Text</RibbonButton>
+          <RibbonButton label="Clear highlight" icon={icon(BrushCleaning)} onClick={onClearConditionalFormat}>Clear</RibbonButton>
         </RibbonGroup>
         <RibbonGroup label="Names">
           <RibbonButton label="Name" icon={icon(Tag)} onClick={onNameSelection} />

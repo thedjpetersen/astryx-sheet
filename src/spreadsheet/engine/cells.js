@@ -4,6 +4,7 @@ export function cloneCellRecord(cell) {
     ...cell,
     format: cell.format ? {...cell.format} : undefined,
     style: cell.style ? {...cell.style} : undefined,
+    link: cell.link ? {...cell.link} : undefined,
   };
 }
 
@@ -22,6 +23,7 @@ export function normalizeCellRecord(input) {
     if (input.format) record.format = {...input.format};
     if (input.style) record.style = {...input.style};
     if (input.note) record.note = String(input.note);
+    if (input.link) record.link = typeof input.link === 'string' ? {href: input.link} : {...input.link};
     return Object.keys(record).length ? record : null;
   }
   if (typeof input === 'string' && input.trim().startsWith('=')) return {formula: input};

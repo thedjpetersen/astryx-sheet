@@ -39,6 +39,7 @@
     "@astryxdesign/theme-neutral": "^0.1.1",
     "@astryxdesign/theme-stone": "^0.1.1",
     "@astryxdesign/theme-y2k": "0.1.1",
+    "@stylexjs/stylex": "^0.18.3",
     "@vitejs/plugin-react": "latest",
     "lucide-react": "^1.21.0",
     "react": "19.1.1",

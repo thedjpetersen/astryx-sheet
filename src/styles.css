@@ -107,14 +107,523 @@ button, input { font: inherit; }
 .formula-wrap {
   grid-area: formula;
   min-width: 0;
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  display: block;
   align-items: center;
-  gap: var(--spacing-1);
-  min-height: 38px;
+  min-height: 41px;
   padding: 4px var(--spacing-3) 5px;
   border-top: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-background-muted) 42%, var(--color-background-surface));
+}
+.excel-formula-button:hover,
+.excel-formula-fx:hover,
+.excel-formula-suggestion:hover {
+  background: var(--color-overlay-hover) !important;
+}
+.excel-formula-button:active,
+.excel-formula-fx:active {
+  background: var(--color-overlay-pressed) !important;
+}
+.excel-formula-entry.formula::selection {
+  color: transparent;
+  background: var(--color-accent-muted);
+}
+.excel-formula-entry::-webkit-scrollbar,
+.excel-formula-callout *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.excel-formula-entry::-webkit-scrollbar-thumb,
+.excel-formula-callout *::-webkit-scrollbar-thumb {
+  background: var(--color-border-emphasized);
+}
+.formula-editor-shell {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--spacing-1);
+  align-items: start;
+}
+.formula-editor-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
+  background: var(--color-background-input);
+}
+.formula-editor-shell.focused .formula-editor-row {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+.formula-status {
+  min-width: 42px;
+  padding: 3px 7px;
+  border-radius: var(--radius-element);
+  border: 1px solid var(--color-border);
+  background: var(--color-background-muted);
+  color: var(--color-text-secondary);
+  font: 600 11px var(--font-family-body);
+  text-align: center;
+  text-transform: uppercase;
+}
+.formula-status.formula {
+  border-color: var(--color-border-blue);
+  background: var(--color-background-blue);
+  color: var(--color-text-blue);
+  text-transform: none;
+}
+.formula-entry-stack {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+  min-height: 22px;
+}
+.formula-entry-highlight {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--color-text-primary);
+  font: 12px var(--font-family-code);
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 2;
+}
+.formula-entry {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+  height: 22px;
+  max-height: 80px;
+  resize: vertical;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: 12px var(--font-family-code);
+  line-height: 20px;
+  overflow: auto;
+}
+.formula-entry.formula {
+  color: transparent;
+  caret-color: var(--color-text-primary);
+}
+.formula-entry.formula::selection {
+  color: transparent;
+  background: var(--color-accent-muted);
+}
+.formula-inline-token {
+  white-space: pre-wrap;
+}
+.formula-inline-token.function {
+  color: var(--color-text-blue);
+  font-weight: 700;
+}
+.formula-inline-token.number {
+  color: var(--color-text-orange);
+}
+.formula-inline-token.string {
+  color: var(--color-text-green);
+}
+.formula-inline-token.boolean {
+  color: var(--color-text-purple);
+  font-weight: 700;
+}
+.formula-inline-token.operator,
+.formula-inline-token.delimiter,
+.formula-inline-token.paren {
+  color: var(--color-text-secondary);
+}
+.formula-inline-token.error,
+.formula-inline-token.unknown {
+  color: var(--color-text-red);
+}
+.formula-inline-token.reference,
+.formula-inline-token.namedRange {
+  color: var(--formula-token-text, var(--color-text-blue));
+  font-weight: 700;
+}
+.formula-inline-token.color-blue { --formula-token-text: var(--color-text-blue); }
+.formula-inline-token.color-green { --formula-token-text: var(--color-text-green); }
+.formula-inline-token.color-purple { --formula-token-text: var(--color-text-purple); }
+.formula-inline-token.color-orange { --formula-token-text: var(--color-text-orange); }
+.formula-inline-token.color-teal { --formula-token-text: var(--color-text-teal); }
+.formula-inline-token.color-pink { --formula-token-text: var(--color-text-pink); }
+.formula-icon-button {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
   background: var(--color-background-surface);
+  color: var(--color-text-secondary);
+  cursor: default;
+}
+.formula-icon-button:hover { background: var(--color-overlay-hover); color: var(--color-text-primary); }
+.formula-open-browser {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
+  background: var(--color-background-surface);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.formula-open-browser:hover { background: var(--color-overlay-hover); }
+.formula-help {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.formula-help-name {
+  color: var(--color-text-blue);
+  font-weight: 700;
+}
+.formula-help code {
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-code);
+}
+.formula-signature-rich {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-code);
+}
+.formula-signature-name {
+  color: var(--color-text-blue);
+  font-weight: 700;
+}
+.formula-signature-paren,
+.formula-signature-separator {
+  color: var(--color-text-secondary);
+}
+.formula-signature-argument {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: var(--radius-element);
+}
+.formula-signature-argument.optional {
+  color: var(--color-text-secondary);
+}
+.formula-signature-argument.variadic {
+  font-style: italic;
+}
+.formula-signature-argument.active {
+  padding: 1px 5px;
+  background: var(--color-accent-muted);
+  color: var(--color-text-accent);
+  font-weight: 800;
+}
+.formula-help .formula-signature-rich {
+  flex: 0 1 auto;
+  max-width: 46%;
+}
+.formula-help-description {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.formula-active-argument {
+  flex: 1 1 180px;
+  min-width: 120px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  padding: 2px 6px;
+  border-radius: var(--radius-element);
+  background: var(--color-accent-muted);
+  color: var(--color-text-accent);
+}
+.formula-active-argument strong {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+.formula-active-argument span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text-secondary);
+}
+.formula-token-strip {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  padding: 1px 0 0 47px;
+  color: var(--color-text-secondary);
+  font: 11px var(--font-family-code);
+  line-height: 19px;
+  white-space: pre;
+}
+.formula-token {
+  flex: 0 0 auto;
+  white-space: pre;
+}
+.formula-token.function {
+  color: var(--color-text-blue);
+  font-weight: 700;
+}
+.formula-token.number {
+  color: var(--color-text-orange);
+}
+.formula-token.string {
+  color: var(--color-text-green);
+}
+.formula-token.boolean {
+  color: var(--color-text-purple);
+  font-weight: 700;
+}
+.formula-token.operator,
+.formula-token.delimiter,
+.formula-token.paren {
+  color: var(--color-text-secondary);
+}
+.formula-token.error,
+.formula-token.unknown {
+  color: var(--color-text-red);
+}
+.formula-token.reference,
+.formula-token.namedRange {
+  margin: 0 1px;
+  padding: 0 4px;
+  border: 1px solid var(--formula-token-border, var(--color-border-blue));
+  border-radius: var(--radius-element);
+  background: var(--formula-token-background, var(--color-background-blue));
+  color: var(--formula-token-text, var(--color-text-blue));
+  font-weight: 700;
+}
+.formula-token.color-blue {
+  --formula-token-border: var(--color-border-blue);
+  --formula-token-background: var(--color-background-blue);
+  --formula-token-text: var(--color-text-blue);
+}
+.formula-token.color-green {
+  --formula-token-border: var(--color-border-green);
+  --formula-token-background: var(--color-background-green);
+  --formula-token-text: var(--color-text-green);
+}
+.formula-token.color-purple {
+  --formula-token-border: var(--color-border-purple);
+  --formula-token-background: var(--color-background-purple);
+  --formula-token-text: var(--color-text-purple);
+}
+.formula-token.color-orange {
+  --formula-token-border: var(--color-border-orange);
+  --formula-token-background: var(--color-background-orange);
+  --formula-token-text: var(--color-text-orange);
+}
+.formula-token.color-teal {
+  --formula-token-border: var(--color-border-teal);
+  --formula-token-background: var(--color-background-teal);
+  --formula-token-text: var(--color-text-teal);
+}
+.formula-token.color-pink {
+  --formula-token-border: var(--color-border-pink);
+  --formula-token-background: var(--color-background-pink);
+  --formula-token-text: var(--color-text-pink);
+}
+.formula-arguments {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+}
+.formula-arguments span {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-code);
+  font-size: 11px;
+}
+.formula-arguments span.active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-muted);
+  color: var(--color-text-accent);
+}
+.formula-preview-result {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, max-content);
+  justify-content: start;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.formula-preview-result span {
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+.formula-preview-result code {
+  min-width: 0;
+  max-width: min(420px, 70vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 7px;
+  border-radius: var(--radius-element);
+  border: 1px solid var(--color-border-green);
+  background: var(--color-background-green);
+  color: var(--color-text-green);
+  font-family: var(--font-family-code);
+}
+.formula-preview-result.error code {
+  border-color: var(--color-border-red);
+  background: var(--color-background-red);
+  color: var(--color-text-red);
+}
+.formula-diagnostics {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 11px;
+}
+.formula-diagnostics span {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 2px 7px;
+  border-radius: var(--radius-element);
+  border: 1px solid var(--color-border-yellow);
+  background: var(--color-background-yellow);
+  color: var(--color-text-yellow);
+}
+.formula-diagnostics span.error {
+  border-color: var(--color-border-red);
+  background: var(--color-background-red);
+  color: var(--color-text-red);
+}
+.formula-diagnostics button {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: var(--radius-element);
+  background: var(--color-background-surface);
+  color: inherit;
+  font: 700 11px var(--font-family-body);
+  padding: 1px 5px;
+}
+.formula-suggestions {
+  position: absolute;
+  z-index: 1002;
+  top: calc(100% + 4px);
+  left: 0;
+  width: min(720px, max(100%, 560px));
+  max-height: 320px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(220px, 0.9fr);
+  gap: 4px;
+  overflow: hidden;
+  padding: 4px;
+  border: 1px solid var(--color-border-emphasized);
+  border-radius: var(--radius-container);
+  background: var(--color-background-popover);
+  box-shadow: var(--shadow-high);
+}
+.formula-suggestion-list {
+  min-width: 0;
+  max-height: 310px;
+  overflow: auto;
+}
+.formula-suggestions button {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(92px, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: var(--radius-element);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.formula-suggestions button:hover,
+.formula-suggestions button.active {
+  background: var(--color-overlay-hover);
+}
+.formula-suggestions button.active {
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+.formula-suggestion-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-text-blue);
+  font-weight: 700;
+}
+.formula-suggestion-signature {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-family-code);
+  font-size: 11px;
+}
+.formula-suggestion-category {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+.formula-suggestion-detail {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-left: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+.formula-suggestion-detail-title {
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+.formula-suggestion-detail code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-code);
+}
+.formula-suggestion-example {
+  padding: 4px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
+  background: var(--color-background-muted);
 }
 .stats { grid-area: stats; align-self: center; display: flex; gap: var(--spacing-1); flex-wrap: wrap; justify-content: flex-end; padding-right: var(--spacing-3); }
 .ribbon-tools {
@@ -354,6 +863,9 @@ button, input { font: inherit; }
   background: var(--color-background-surface); contain: layout paint style;
 }
 .cell.formula-cell { color: var(--color-text-blue); font-weight: 600; }
+.cell.spill-cell { background: color-mix(in srgb, var(--color-background-blue) 28%, var(--color-background-surface)); box-shadow: inset 0 0 0 1px var(--color-border-blue); }
+.cell.hyperlink-cell { color: var(--color-text-blue); text-decoration: underline; text-underline-offset: 2px; }
+.cell.note-cell { background-image: linear-gradient(135deg, transparent calc(100% - 8px), var(--color-warning) 0); }
 .cell.edited-cell::after { content: ""; position: absolute; top: 2px; right: 2px; width: 0; height: 0; border-top: 7px solid var(--color-accent); border-left: 7px solid transparent; opacity: .9; }
 .cell.invalid-cell { background: color-mix(in srgb, var(--color-background-red) 36%, var(--color-background-surface)); box-shadow: inset 0 0 0 1px var(--color-border-red); }
 .cell.invalid-cell::before { content: ""; position: absolute; top: 2px; left: 2px; width: 0; height: 0; border-top: 7px solid var(--color-border-red); border-right: 7px solid transparent; opacity: .95; }
@@ -365,6 +877,37 @@ button, input { font: inherit; }
 .status-live, .status-done { background: var(--color-background-green); color: var(--color-text-green); border-color: var(--color-border-green); }
 .status-blocked { background: var(--color-background-red); color: var(--color-text-red); border-color: var(--color-border-red); }
 .status-review, .status-needs-review { background: var(--color-background-yellow); color: var(--color-text-yellow); border-color: var(--color-border-yellow); }
+.formula-reference-layer { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.formula-reference-overlay {
+  position: absolute;
+  border: 2px solid var(--formula-reference-border, var(--color-border-blue));
+  background: color-mix(in srgb, var(--formula-reference-fill, var(--color-background-blue)) 42%, transparent);
+  box-shadow: 0 0 0 1px var(--color-background-surface) inset;
+}
+.formula-reference-overlay.color-blue {
+  --formula-reference-border: var(--color-border-blue);
+  --formula-reference-fill: var(--color-background-blue);
+}
+.formula-reference-overlay.color-green {
+  --formula-reference-border: var(--color-border-green);
+  --formula-reference-fill: var(--color-background-green);
+}
+.formula-reference-overlay.color-purple {
+  --formula-reference-border: var(--color-border-purple);
+  --formula-reference-fill: var(--color-background-purple);
+}
+.formula-reference-overlay.color-orange {
+  --formula-reference-border: var(--color-border-orange);
+  --formula-reference-fill: var(--color-background-orange);
+}
+.formula-reference-overlay.color-teal {
+  --formula-reference-border: var(--color-border-teal);
+  --formula-reference-fill: var(--color-background-teal);
+}
+.formula-reference-overlay.color-pink {
+  --formula-reference-border: var(--color-border-pink);
+  --formula-reference-fill: var(--color-background-pink);
+}
 .selection-overlay { position: absolute; pointer-events: none; border: 2px solid var(--color-accent); background: color-mix(in srgb, var(--color-accent) 14%, transparent); transform: translate3d(-10000px,-10000px,0); z-index: 4; will-change: transform, width, height; box-shadow: 0 0 0 1px var(--color-on-accent) inset; }
 .app.high-contrast-selection .selection-overlay { border-width: 3px; background: color-mix(in srgb, var(--color-accent) 24%, transparent); box-shadow: 0 0 0 2px var(--color-background-surface) inset, 0 0 0 2px var(--color-accent); }
 .fill-handle { position: absolute; right: -5px; bottom: -5px; width: 9px; height: 9px; border-radius: 3px; background: var(--color-accent); border: 1px solid var(--color-background-surface); }
@@ -379,10 +922,144 @@ button, input { font: inherit; }
 .menu-icon { color: var(--color-text-accent); text-align: center; }
 .menu-shortcut { color: var(--color-text-secondary); font-size: 11px; }
 .menu-separator { height: 1px; margin: var(--spacing-1) 0; background: var(--color-border); }
-.formula-popover { position: absolute; z-index: 1001; top: 78px; left: min(520px, 34vw); width: min(360px, calc(100vw - 32px)); box-shadow: var(--shadow-high); border-color: var(--color-border-emphasized) !important; }
-.function-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-1); margin-top: var(--spacing-2); }
-.function-grid button { justify-content: space-between; min-width: 0; }
-.formula-preview { margin-top: var(--spacing-2); padding: var(--spacing-2); border-radius: var(--radius-element); background: var(--color-background-muted); border: 1px solid var(--color-border); color: var(--color-text-blue); font-family: var(--font-family-code); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.formula-popover {
+  position: absolute;
+  z-index: 1001;
+  top: 78px;
+  left: min(420px, 24vw);
+  width: min(720px, calc(100vw - 32px));
+  box-shadow: var(--shadow-high);
+  border-color: var(--color-border-emphasized) !important;
+}
+.formula-popover-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+}
+.function-search {
+  margin-top: var(--spacing-2);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
+  background: var(--color-background-input);
+}
+.function-search input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: 12px var(--font-family-body);
+}
+.function-category-row {
+  display: flex;
+  gap: 4px;
+  margin-top: var(--spacing-2);
+  overflow-x: auto;
+}
+.function-category {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
+  background: var(--color-background-surface);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+.function-category.active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-muted);
+  color: var(--color-text-accent);
+}
+.function-picker-body {
+  display: grid;
+  grid-template-columns: minmax(230px, 1fr) minmax(220px, .9fr);
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-2);
+  min-height: 260px;
+}
+.function-list {
+  min-width: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
+  background: var(--color-background-surface);
+}
+.function-list-item {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(92px, auto) auto;
+  gap: 3px 8px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--radius-element);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.function-list-item:hover,
+.function-list-item.active {
+  background: var(--color-overlay-hover);
+}
+.function-list-name {
+  color: var(--color-text-blue);
+  font-weight: 700;
+}
+.function-list-meta {
+  justify-self: end;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+.function-list-signature {
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-code);
+  font-size: 11px;
+}
+.function-detail {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
+  background: var(--color-background-muted);
+}
+.function-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-text-blue);
+  font-weight: 800;
+  font-size: 16px;
+}
+.function-signature,
+.formula-preview {
+  padding: var(--spacing-2);
+  border-radius: var(--radius-element);
+  background: var(--color-background-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-blue);
+  font-family: var(--font-family-code);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.formula-preview { margin-top: var(--spacing-2); }
 @media (max-width: 1120px) {
   .topbar {
     grid-template-columns: auto minmax(0, 1fr);
@@ -401,5 +1078,15 @@ button, input { font: inherit; }
   .ribbon-tabs, .ribbon-tools, .formula-wrap { padding-left: var(--spacing-1); padding-right: var(--spacing-1); }
   .ribbon-tab { padding: 0 12px; }
   .ribbon-group { padding-left: var(--spacing-1); padding-right: var(--spacing-1); }
-  .formula-wrap { grid-template-columns: auto auto minmax(0, 1fr); }
+  .formula-wrap { min-height: 40px; }
+  .excel-formula-bar { grid-template-columns: 74px auto 34px minmax(0, 1fr) !important; }
+  .excel-formula-callout {
+    left: 0 !important;
+    width: min(440px, calc(100vw - 16px)) !important;
+    grid-template-columns: 1fr !important;
+  }
+  .excel-formula-callout aside { display: none !important; }
+  .formula-popover { left: 8px; right: 8px; width: auto; }
+  .function-picker-body { grid-template-columns: 1fr; }
+  .function-detail { display: none; }
 }

@@ -24,21 +24,28 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Engine-backed copy/paste for TSV selection data
 - Engine-backed HTML table clipboard import/export for richer external spreadsheet paste payloads
 - Grouped workbook commands and range-copy helpers for compound undo, metadata-preserving copies, and relative formula translation
-- Formula dependency graph utilities for dirty-cell discovery and recalculation ordering
+- Engine-backed Fill Down and Fill Right helpers that preserve metadata and translate relative formula references, including whole-row and whole-column ranges
+- Formula dependency graph utilities for dirty-cell discovery, workbook-level cross-sheet dependencies, literal-safe named ranges, and recalculation ordering
 - Cached recalculation helpers for full-sheet and dirty-formula updates
-- Command dispatch wrapper that derives changed cells and refreshes dependent formula caches
+- Command dispatch wrapper that derives changed cells and selectively refreshes dependent formula caches across sheets
+- Headless controller calculation modes for automatic recalculation, manual dirty tracking, and selective explicit workbook recalculation
+- Multi-sheet formula references resolve through the headless workbook engine, including quoted sheet names
 - React spreadsheet cell edits, clears, paste actions, and history navigation use the recalculating engine path
 - Inspector metrics for formula cells, cached formula results, and formula errors
 - Engine-level number, currency, percent, date, and text formatting with undoable range format commands
 - React toolbar actions for applying common engine-backed number formats to the current selection
+- Engine-level cell styling for bold text, borders, fill color, text color, and alignment with undo/redo, snapshots, SpreadsheetML style round trips, and grid rendering
+- React toolbar actions for applying common engine-backed cell styles to the current selection
 - Undoable engine range sorting with header-aware, numeric, date, and text comparison
 - React toolbar actions for sorting the selected range by the active column
-- CSV, TSV, HTML table, and SpreadsheetML XML import/export helpers for embedding and data interchange
-- Workbook-level named ranges with undo/redo and snapshot serialization
-- Named ranges participate in formula dependency tracking and cached recalculation
+- CSV, TSV, HTML table, and SpreadsheetML XML import/export helpers for embedding and data interchange, including formulas, sheet dimensions, row/column sizes, number formats, cell styles, notes, hyperlinks, conditional formats, named ranges, and merged ranges
+- Workbook-level named ranges with undo/redo, cross-sheet formula resolution, and snapshot serialization
+- Named ranges participate in formula dependency tracking and cached recalculation across sheets
 - React toolbar actions for creating and removing named ranges from the current selection
 - Multi-sheet workbook commands for adding, activating, renaming, and removing sheets with undo/redo
 - React sheet tabs for switching, adding, renaming, and removing workbook sheets from the embedded UI
+- Undoable engine commands for inserting/deleting rows and columns, with sparse-cell, dimension, metadata, and formula-reference shifting
+- Right-click menu actions for fill, inserting/deleting rows, and inserting/deleting columns through the same headless command path
 - Sheet filter state with criteria evaluation, visible-row selectors, undo/redo, and snapshot serialization
 - React toolbar filtering that collapses hidden rows through the virtualized row metrics
 - Merged range metadata with overlap validation, undo/redo, selectors, and snapshot serialization
@@ -47,22 +54,35 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Data validation rules with list, number, and text predicates plus undo/redo and snapshot serialization
 - React edit, clear, and paste flows enforce host-provided validation rules and mark invalid visible cells
 - React toolbar actions for adding number/list validation rules and clearing active validation rules
+- Conditional formatting rules with number, text, blank, and error predicates plus undo/redo, snapshot serialization, structural range shifting, and React grid rendering
+- React toolbar actions for adding number/text conditional highlights and clearing conditional formatting
+- Cell notes with undo/redo, snapshot serialization, SpreadsheetML comment round trips, copy preservation, grid markers, and context-menu editing
+- Cell hyperlinks with undo/redo, snapshot serialization, SpreadsheetML `HRef` round trips, copy preservation, grid styling/tooltips, and context-menu editing/opening
 - Inspector metrics for merged ranges, validation rules, and named ranges
-- Formula evaluation for aggregates, `IF`, logical predicates, scalar math, text helpers, cell references, ranges, comparisons, and basic arithmetic
+- Formula evaluation for aggregates, conditional aggregates including `MINIFS`/`MAXIFS`, lookup/reference helpers including `LOOKUP`/`XMATCH`/`ROW`/`COLUMN`/`ROWS`/`COLUMNS`/`ADDRESS`/`INDIRECT`/`OFFSET`, dynamic-array helpers including `FILTER`/`UNIQUE`/`SORT`/`SEQUENCE`/`TRANSPOSE` with engine-backed spill display and spilled-range references such as `A1#`, `LET` scalar and range variables, `IF`, `IFS`, `SWITCH`, `CHOOSE`, logical predicates, scalar math, text helpers, same-sheet and cross-sheet cell references/ranges including referenced-sheet-bounded whole-column and whole-row ranges, comparisons, and basic arithmetic
+- Engine-owned formula catalog used by the React function picker, with reusable formula templates for embedded surfaces
+- Google Sheets-style formula entry affordances in React, including keyboard autocomplete across the full engine function catalog, named ranges, and workbook sheet names, model-backed formula token highlighting, colored grid overlays for same-sheet formula references, click/drag range picking that replaces the active reference token, `F4` absolute/relative reference cycling, argument-aware signatures, live engine-backed draft result/error previews, formula diagnostics, searchable function browsing, descriptions, draft/insert flows, and range-aware template previews from the engine-owned catalog
+- Formula evaluation for date/time helpers including `TIME`/`TIMEVALUE`/`HOUR`/`MINUTE`/`SECOND`/`DATEVALUE`/`WEEKNUM`/`ISOWEEKNUM`/`DAYS`/`DAYS360`/`YEARFRAC`/`DATEDIF`/`WEEKDAY`/`NETWORKDAYS`/`NETWORKDAYS.INTL`/`WORKDAY`/`WORKDAY.INTL`, text extraction/search/substitution/replacement helpers including `PROPER`/`CHAR`/`CODE`/`CLEAN`/`TEXT`/`FIXED`/`DOLLAR`/`NUMBERVALUE`/`TEXTBEFORE`/`TEXTAFTER`, financial helpers such as `PMT`/`PV`/`FV`/`NPER`/`RATE`/`IPMT`/`PPMT`/`NPV`/`IRR`/`XNPV`/`XIRR`, aggregate helpers such as `PRODUCT`/`SUMSQ`/`COUNTBLANK`/`AVERAGEA`, statistical helpers including percentile/quartile helpers, `MODE.SNGL`, `RANK.EQ`, `RANK.AVG`, `GEOMEAN`, `HARMEAN`, `CORREL`, covariance, regression/forecast helpers, `STDEV.S`/`STDEV.P`/variance, logarithm/trigonometry helpers, combinatoric/math helpers such as `MROUND`/`QUOTIENT`/`GCD`/`LCM`/`COMBIN`/`PERMUT`, and common scalar math helpers
+- Formula expressions can combine function calls, cell references, comparisons, and arithmetic in the same formula
+- Formula syntax supports Excel-style exponent `^`, postfix percent, and text concatenation with `&`
+- Formula evaluation returns and caches spreadsheet errors such as `#DIV/0!`, `#NUM!`, `#VALUE!`, and `#NAME?`
+- Volatile formula support for `TODAY`, `NOW`, `RAND`, `RANDBETWEEN`, `INDIRECT`, and `OFFSET`, including dependent-cache recalculation
+- Defensive formula helpers including `IFERROR`, `IFNA`, `ISERROR`, `ISNA`, `ISBLANK`, `ISNUMBER`, `ISTEXT`, `ISEVEN`, `ISODD`, `ISFORMULA`, `FORMULATEXT`, `N`, `T`, `TYPE`, and `ERROR.TYPE`
 - Right-click context menu for edit, clear, copy, resize, and sample formula actions
 - Live inspector panel showing mounted cells, sparse overrides, effect-registered geometry, and approximate FPS
 - Demo options for theme selection (default: Neutral), dark mode, inspector visibility, compact row density, and high-contrast selection
 - Embeddable source package exports for the React `Spreadsheet` component and a React-independent workbook engine
-- `onWorkbookChange` callback for host applications that need workbook state after cell, sheet, history, format, filter, sort, clipboard, or resize commands
-- Headless `createWorkbookController` API for non-React command dispatch, subscriptions, history, recalculation, and snapshots
+- React `Spreadsheet` can own an internal headless controller or consume a host-provided `workbookController`
+- `onWorkbookChange` callback for host applications that need workbook state after cell, sheet, history, format, conditional format, filter, sort, clipboard, or resize commands
+- Headless `createWorkbookController` API for non-React command dispatch, subscriptions, history, calculation modes, recalculation, and snapshots
 - Headless `createWorkbookPersistence` helpers for binding controller snapshots to host storage, including an in-memory adapter for tests and non-browser runtimes
 - Headless command journal helpers for recording and replaying controller commands in collaboration or audit-log workflows
-- SpreadsheetML XML adapter for dependency-free Excel-readable workbook import/export
+- SpreadsheetML XML adapter for dependency-free Excel-readable workbook import/export with number-format, cell-style, note/comment, hyperlink, conditional-format, named-range, and merged-range round trips
 - Workbook engine primitives for sparse sheets, active-sheet state, cells, formulas, commands, undo/redo, TSV clipboard data, and JSON snapshots
 
 ## Why this exists
 
-Spreadsheet UIs are a good stress test for generated React code. Many interactions — drag selection, scroll-linked headers, resize guides — should not push every pixel through React state. This repo keeps semantic state in React while using refs, `requestAnimationFrame`, and direct DOM transforms for frame-by-frame interaction feedback.
+Spreadsheet UIs are a good stress test for generated React code. Many interactions — drag selection, scroll-linked headers, resize guides — should not push every pixel through React state. This repo keeps workbook semantics in the headless engine/controller while React owns viewport interaction state and uses refs, `requestAnimationFrame`, and direct DOM transforms for frame-by-frame feedback.
 
 ```text
 React state:

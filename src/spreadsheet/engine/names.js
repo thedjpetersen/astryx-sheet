@@ -42,21 +42,49 @@ export function listNamedRanges(workbook) {
   return Array.from(workbook.namedRanges.values()).map(cloneNamedRange);
 }
 
-export function rangeToFormulaReference(range) {
-  return `${cellAddress(range.r1, range.c1)}:${cellAddress(range.r2, range.c2)}`;
+function quoteSheetReference(sheetRef) {
+  if (!sheetRef) return '';
+  return `'${String(sheetRef).replace(/'/g, "''")}'!`;
+}
+
+export function rangeToFormulaReference(range, sheetRef = null) {
+  return `${quoteSheetReference(sheetRef)}${cellAddress(range.r1, range.c1)}:${cellAddress(range.r2, range.c2)}`;
 }
 
 function escapeRegExp(text) {
   return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function protectFormulaSegments(text) {
+  const placeholders = [];
+  const reserve = (value) => {
+    const placeholder = `__ASTRYX_NAME_SEGMENT_${placeholders.length}__`;
+    placeholders.push(value);
+    return placeholder;
+  };
+  const protectedText = String(text ?? '').replace(
+    /"(?:""|[^"])*"|(?:'[^']*(?:''[^']*)*'|[A-Za-z_][A-Za-z0-9_]*)!/g,
+    reserve,
+  );
+  return {
+    text: protectedText,
+    restore(source) {
+      return String(source ?? '').replace(/__ASTRYX_NAME_SEGMENT_(\d+)__/g, (_match, indexText) => (
+        placeholders[Number(indexText)] || _match
+      ));
+    },
+  };
+}
+
 export function expandNamedRangesInFormula(formula, namedRanges, sheetId) {
-  let text = String(formula ?? '');
+  const protectedFormula = protectFormulaSegments(formula);
+  let text = protectedFormula.text;
   const ranges = namedRanges instanceof Map ? Array.from(namedRanges.values()) : namedRanges || [];
   for (const namedRange of ranges.sort((a, b) => b.name.length - a.name.length)) {
-    if (namedRange.sheetId && sheetId && namedRange.sheetId !== sheetId) continue;
+    if (namedRange.scope === 'sheet' && namedRange.sheetId && sheetId && namedRange.sheetId !== sheetId) continue;
     const pattern = new RegExp(`(^|[^A-Z0-9_])(${escapeRegExp(namedRange.name)})(?=[^A-Z0-9_]|$)`, 'gi');
-    text = text.replace(pattern, (_match, prefix) => `${prefix}${rangeToFormulaReference(namedRange.range)}`);
+    const sheetRef = namedRange.sheetId && namedRange.sheetId !== sheetId ? namedRange.sheetId : null;
+    text = text.replace(pattern, (_match, prefix) => `${prefix}${rangeToFormulaReference(namedRange.range, sheetRef)}`);
   }
-  return text;
+  return protectedFormula.restore(text);
 }
