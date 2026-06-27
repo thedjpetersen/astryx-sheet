@@ -29,6 +29,7 @@
 - Connected filter state to the React toolbar, virtualized row metrics, and inspector metrics.
 - Added merged range metadata with overlap validation, command history, selectors, and snapshot serialization.
 - Added data validation rules with command history, selectors, predicate evaluation, and snapshot serialization.
+- Surfaced merged range, validation rule, and named range counts in the inspector.
 
 ## Current Direction
 

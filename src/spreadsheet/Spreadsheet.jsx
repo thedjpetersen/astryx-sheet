@@ -576,6 +576,11 @@ export function Spreadsheet({
     }
     return {formulas, cached, errors};
   }, [activeSheet]);
+  const structureStats = useMemo(() => ({
+    merges: activeSheet.merges.size,
+    validations: activeSheet.validations.size,
+    namedRanges: workbook.namedRanges.size,
+  }), [activeSheet, workbook]);
   const totalWidth = colMetrics.total();
   const totalHeight = rowMetrics.total();
   const activeAddress = cellAddress(activeCell.row, activeCell.col);
@@ -700,6 +705,7 @@ export function Spreadsheet({
             edits={cellDataRef.current.size}
             calculationStats={calculationStats}
             filterStats={{active: activeSheet.filters.size, hiddenRows: filteredRows?.hiddenRows?.length || 0}}
+            structureStats={structureStats}
             fps={fps}
             dataRef={cellDataRef}
           />

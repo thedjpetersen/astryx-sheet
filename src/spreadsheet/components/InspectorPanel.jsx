@@ -9,7 +9,7 @@ import {Table, proportional, pixel} from '@astryxdesign/core/Table';
 import {cellAddress} from '../model/address.js';
 import {displayCellValue, readCell} from '../model/formulas.js';
 
-export function InspectorPanel({gridConfig, getDefaultCellValue, view, activeCell, selection, rowOverrides, colOverrides, cellMetaRef, rowMetaRef, edits, calculationStats, filterStats, fps, dataRef}) {
+export function InspectorPanel({gridConfig, getDefaultCellValue, view, activeCell, selection, rowOverrides, colOverrides, cellMetaRef, rowMetaRef, edits, calculationStats, filterStats, structureStats, fps, dataRef}) {
   const selectedText = selection ? `${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}` : 'none';
   const visibleCells = Math.max(0, (view.rowEnd - view.rowStart + 1) * (view.colEnd - view.colStart + 1));
   const activeRaw = readCell(dataRef, activeCell.row, activeCell.col, getDefaultCellValue);
@@ -23,6 +23,9 @@ export function InspectorPanel({gridConfig, getDefaultCellValue, view, activeCel
     {id: 'errors', metric: 'Formula errors', value: String(calculationStats?.errors || 0), status: 'Calc'},
     {id: 'filters', metric: 'Active filters', value: String(filterStats?.active || 0), status: 'Filter'},
     {id: 'hidden', metric: 'Hidden rows', value: String(filterStats?.hiddenRows || 0), status: 'Filter'},
+    {id: 'merges', metric: 'Merged ranges', value: String(structureStats?.merges || 0), status: 'Model'},
+    {id: 'validations', metric: 'Validation rules', value: String(structureStats?.validations || 0), status: 'Model'},
+    {id: 'names', metric: 'Named ranges', value: String(structureStats?.namedRanges || 0), status: 'Model'},
     {id: 'rows', metric: 'Custom rows', value: String(rowOverrides.size), status: 'Map'},
     {id: 'cols', metric: 'Custom columns', value: String(colOverrides.size), status: 'Map'},
     {id: 'fps', metric: 'Approx FPS', value: String(fps), status: 'rAF'},

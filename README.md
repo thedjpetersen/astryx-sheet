@@ -39,6 +39,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - React toolbar filtering that collapses hidden rows through the virtualized row metrics
 - Merged range metadata with overlap validation, undo/redo, selectors, and snapshot serialization
 - Data validation rules with list, number, and text predicates plus undo/redo and snapshot serialization
+- Inspector metrics for merged ranges, validation rules, and named ranges
 - Formula evaluation for `SUM`, `AVERAGE` / `AVG`, `MIN`, `MAX`, `COUNT`, `CONCAT`, cell references, ranges, and basic arithmetic
 - Right-click context menu for edit, clear, copy, resize, and sample formula actions
 - Live inspector panel showing mounted cells, sparse overrides, effect-registered geometry, and approximate FPS
