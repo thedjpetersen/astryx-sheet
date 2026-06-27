@@ -31,6 +31,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Engine-level number, currency, percent, date, and text formatting with undoable range format commands
 - React toolbar actions for applying common engine-backed number formats to the current selection
 - Undoable engine range sorting with header-aware, numeric, date, and text comparison
+- React toolbar actions for sorting the selected range by the active column
 - Formula evaluation for `SUM`, `AVERAGE` / `AVG`, `MIN`, `MAX`, `COUNT`, `CONCAT`, cell references, ranges, and basic arithmetic
 - Right-click context menu for edit, clear, copy, resize, and sample formula actions
 - Live inspector panel showing mounted cells, sparse overrides, effect-registered geometry, and approximate FPS

@@ -150,11 +150,9 @@ function compareSortValues(a, b, type) {
   if (emptyA && emptyB) return 0;
   if (emptyA) return 1;
   if (emptyB) return -1;
-  if (type === 'number') {
-    const numberA = Number(String(a).replace(/[$,%\s,]/g, ''));
-    const numberB = Number(String(b).replace(/[$,%\s,]/g, ''));
-    if (Number.isFinite(numberA) && Number.isFinite(numberB)) return numberA - numberB;
-  }
+  const numberA = Number(String(a).replace(/[$,%\s,]/g, ''));
+  const numberB = Number(String(b).replace(/[$,%\s,]/g, ''));
+  if ((type === 'number' || type == null || type === 'auto') && Number.isFinite(numberA) && Number.isFinite(numberB)) return numberA - numberB;
   const dateA = type === 'date' ? new Date(a).getTime() : NaN;
   const dateB = type === 'date' ? new Date(b).getTime() : NaN;
   if (Number.isFinite(dateA) && Number.isFinite(dateB)) return dateA - dateB;

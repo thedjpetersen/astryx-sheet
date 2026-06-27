@@ -35,6 +35,8 @@ export function SpreadsheetToolbar({
   onFormatCurrency,
   onFormatPercent,
   onFormatDate,
+  onSortAscending,
+  onSortDescending,
   onWidenActiveColumn,
   onTallerActiveRow,
   themeName,
@@ -91,6 +93,8 @@ export function SpreadsheetToolbar({
         <Button label="$" variant="secondary" size="sm" onClick={onFormatCurrency} />
         <Button label="%" variant="secondary" size="sm" onClick={onFormatPercent} />
         <Button label="Date" variant="secondary" size="sm" onClick={onFormatDate} />
+        <Button label="Sort A-Z" variant="secondary" size="sm" onClick={onSortAscending} />
+        <Button label="Sort Z-A" variant="secondary" size="sm" onClick={onSortDescending} />
         <Button label="Widen column" variant="secondary" size="sm" onClick={onWidenActiveColumn} />
         <Button label="Taller row" variant="secondary" size="sm" onClick={onTallerActiveRow} />
         <span className="toolbar-spacer" />

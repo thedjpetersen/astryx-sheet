@@ -301,6 +301,28 @@ export function Spreadsheet({
     setDataVersion((v) => v + 1);
     showToast(`Formatted ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)} as ${label}`);
   }, [activeCell, committedSelection, onCellChange, showToast]);
+  const sortSelection = useCallback((direction) => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    if (selection.r2 <= selection.r1) {
+      showToast('Select multiple rows to sort', 'error');
+      return;
+    }
+    const sortCol = activeCell.col >= selection.c1 && activeCell.col <= selection.c2 ? activeCell.col : selection.c1;
+    const command = {
+      type: CommandType.SORT_RANGE,
+      range: selection,
+      hasHeader: selection.r1 === 0,
+      sortBy: [{col: sortCol, direction, type: 'auto'}],
+      label: direction === 'asc' ? 'Sort ascending' : 'Sort descending',
+    };
+    const result = dispatchCommandWithRecalculation(workbookRef.current, command, {getDefaultCellValue});
+    workbookRef.current = result.workbook;
+    setWorkbook(result.workbook);
+    setDataVersion((v) => v + 1);
+    syncFormulaDraftFromWorkbook(result.workbook);
+    onCellChange?.({selection, sort: {col: sortCol, direction}, cells: getActiveSheet(result.workbook).cells, workbook: result.workbook, recalculated: result.recalculated});
+    showToast(direction === 'asc' ? 'Sorted ascending' : 'Sorted descending');
+  }, [activeCell, committedSelection, getDefaultCellValue, onCellChange, showToast, syncFormulaDraftFromWorkbook]);
   const resizeColumn = useCallback((col, size) => {
     setWorkbook((currentWorkbook) => {
       const nextWorkbook = dispatchCommand(currentWorkbook, {type: CommandType.RESIZE_COLUMN, col, size});
@@ -552,6 +574,8 @@ export function Spreadsheet({
           onFormatCurrency={() => formatSelection({type: NumberFormatType.CURRENCY, currency: 'USD', decimals: 2}, 'currency')}
           onFormatPercent={() => formatSelection({type: NumberFormatType.PERCENT, decimals: 1}, 'percent')}
           onFormatDate={() => formatSelection({type: NumberFormatType.DATE}, 'date')}
+          onSortAscending={() => sortSelection('asc')}
+          onSortDescending={() => sortSelection('desc')}
           onWidenActiveColumn={() => resizeColumn(activeCell.col, colMetrics.size(activeCell.col) + 20)}
           onTallerActiveRow={() => resizeRow(activeCell.row, rowMetrics.size(activeCell.row) + 6)}
           themeName={themeName}
