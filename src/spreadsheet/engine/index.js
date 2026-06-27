@@ -4,6 +4,7 @@ export {cloneCellForPaste, createClipboardBatchCommand, createCopyRangeCommand, 
 export {createWorkbookController} from './controller.js';
 export {DelimitedFormat, createImportDelimitedCommand, delimiterForFormat, parseDelimited, rangeToDelimited} from './delimited.js';
 export {createImportHtmlTableCommand, parseHtmlTable, rangeToHtmlTable} from './html.js';
+export {createMemoryWorkbookStorage, createWorkbookPersistence, createWorkbookStorageAdapter} from './persistence.js';
 export {dispatchCommandWithRecalculation, evaluateCellForCache, getCachedCellDisplayValue, recalculateSheet, recalculateWorkbook} from './calculation.js';
 export {buildDependencyGraph, collectDependentCells, extractFormulaReferences, getFormulaRecalculationOrder} from './dependencies.js';
 export {cloneFilter, createFilter, createFilterStore, getVisibleRowsForFilter, getVisibleRowsForSheet, matchesFilterCriterion} from './filters.js';

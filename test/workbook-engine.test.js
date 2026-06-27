@@ -6,9 +6,11 @@ import {
   createCopyRangeCommand,
   createImportDelimitedCommand,
   createImportHtmlTableCommand,
+  createMemoryWorkbookStorage,
   createPasteTsvCommand,
   createWorkbook,
   createWorkbookController,
+  createWorkbookPersistence,
   deserializeWorkbook,
   dispatchCommand,
   dispatchCommandWithRecalculation,
@@ -119,6 +121,32 @@ test('workbook controller handles history, snapshots, and formula recalculation'
   assert.equal(getCachedCellDisplayValue(restoredController.getActiveSheet(), 0, 1), '5');
   assert.equal(events[0].source, 'subscribe');
   assert.equal(events.some((event) => event.source === 'history' && event.action === 'undo'), true);
+});
+
+test('workbook persistence saves controller snapshots to storage and loads them', async () => {
+  const storage = createMemoryWorkbookStorage();
+  const controller = createWorkbookController({sheets: [{id: 'sheet-1'}]});
+  const persistence = createWorkbookPersistence(controller, {key: 'embedded-book', storage});
+
+  controller.dispatch({type: CommandType.SET_CELL, row: 4, col: 2, value: 'Persisted'});
+  await persistence.flush();
+
+  const rawSnapshot = storage.getItem('embedded-book');
+  assert.equal(typeof rawSnapshot, 'string');
+  assert.equal(JSON.parse(rawSnapshot).activeSheetId, 'sheet-1');
+
+  const restoredController = createWorkbookController();
+  const restoredPersistence = createWorkbookPersistence(restoredController, {key: 'embedded-book', storage});
+  const loadedSnapshot = await restoredPersistence.load();
+
+  assert.equal(loadedSnapshot.activeSheetId, 'sheet-1');
+  assert.equal(getCellRawValue(restoredController.getWorkbook(), 'sheet-1', 4, 2), 'Persisted');
+
+  restoredPersistence.destroy();
+  restoredController.dispatch({type: CommandType.SET_CELL, row: 4, col: 2, value: 'Unsaved'});
+  await restoredPersistence.flush();
+
+  assert.equal(getCellRawValue(deserializeWorkbook(JSON.parse(storage.getItem('embedded-book'))), 'sheet-1', 4, 2), 'Persisted');
 });
 
 test('batch commands undo and redo as one history entry', () => {
