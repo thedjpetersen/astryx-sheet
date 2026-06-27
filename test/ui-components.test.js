@@ -4,6 +4,8 @@ import {readFile} from 'node:fs/promises';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {createServer} from 'vite';
+import {createSheetDataRef, createWorkbook} from '../src/spreadsheet/engine/index.js';
+import {makeDimensionHelpers} from '../src/spreadsheet/model/dimensions.js';
 
 let viteServer;
 let uiModulesPromise;
@@ -23,6 +25,7 @@ async function loadUiModules() {
         contextMenuModule,
         sheetTabsModule,
         cellModule,
+        rowFragmentModule,
         spreadsheetModule,
         formulaEditorModule,
       ] = await Promise.all([
@@ -31,6 +34,7 @@ async function loadUiModules() {
         viteServer.ssrLoadModule('/src/spreadsheet/components/NativeContextMenu.jsx'),
         viteServer.ssrLoadModule('/src/spreadsheet/components/SheetTabs.jsx'),
         viteServer.ssrLoadModule('/src/spreadsheet/components/Cell.jsx'),
+        viteServer.ssrLoadModule('/src/spreadsheet/components/RowFragment.jsx'),
         viteServer.ssrLoadModule('/src/spreadsheet/Spreadsheet.jsx'),
         viteServer.ssrLoadModule('/src/spreadsheet/components/FormulaEditor.jsx'),
       ]);
@@ -40,6 +44,7 @@ async function loadUiModules() {
         NativeContextMenu: contextMenuModule.NativeContextMenu,
         SheetTabs: sheetTabsModule.SheetTabs,
         Cell: cellModule.Cell,
+        RowFragment: rowFragmentModule.RowFragment,
         Spreadsheet: spreadsheetModule.Spreadsheet,
         FormulaEditor: formulaEditorModule.FormulaEditor,
       };
@@ -549,4 +554,58 @@ test('function picker and cell components render spreadsheet state correctly', a
   assert.match(cellHtml, /merged-cell/);
   assert.match(cellHtml, /formula-cell/);
   assert.match(cellHtml, /aria-invalid="true"/);
+});
+
+test('row fragment computes cell display state and forwards cell events', async () => {
+  const {Cell, RowFragment} = await loadUiModules();
+  const workbook = createWorkbook({
+    sheets: [{
+      id: 'sheet-1',
+      cells: {
+        '1:1': {value: '21', note: 'Review'},
+        '1:2': {formula: '=B2*2'},
+      },
+    }],
+    activeSheetId: 'sheet-1',
+  });
+  const sheet = workbook.sheets.get('sheet-1');
+  const colMetrics = makeDimensionHelpers(100, 4, new Map([[1, 120]]));
+  const rowMetrics = makeDimensionHelpers(24, 4, new Map([[1, 30]]));
+  const onPointerDown = () => {};
+  const onContextMenu = () => {};
+  const onDoubleClick = () => {};
+  const row = RowFragment.type({
+    row: 1,
+    y: rowMetrics.offset(1),
+    height: rowMetrics.size(1),
+    columns: [1, 2],
+    colMetrics,
+    rowMetrics,
+    firstRenderedRow: 1,
+    firstRenderedCol: 1,
+    activeCell: {row: 1, col: 2},
+    workbook,
+    sheetId: 'sheet-1',
+    dataRef: createSheetDataRef(sheet),
+    dataVersion: 0,
+    getDefaultCellValue: () => '',
+    onPointerDown,
+    onContextMenu,
+    onDoubleClick,
+  });
+  const cells = collectElements(row, (element) => element.type === Cell);
+  assert.equal(cells.length, 2);
+  assert.equal(cells[0].props.value, '21');
+  assert.equal(cells[0].props.note, 'Review');
+  assert.equal(cells[1].props.value, '42');
+  assert.equal(cells[1].props.rawValue, '=B2*2');
+  assert.equal(cells[1].props.active, true);
+  assert.equal(cells[1].props.onPointerDown, onPointerDown);
+  assert.equal(cells[1].props.onContextMenu, onContextMenu);
+  assert.equal(cells[1].props.onDoubleClick, onDoubleClick);
+
+  const cellSource = await readFile(new URL('../src/spreadsheet/components/Cell.jsx', import.meta.url), 'utf8');
+  assert.match(cellSource, /onPointerDown=\{\(e\) => onPointerDown\(e, row, col\)\}/);
+  assert.match(cellSource, /onContextMenu=\{\(e\) => onContextMenu\(e, row, col\)\}/);
+  assert.match(cellSource, /onDoubleClick=\{\(e\) => onDoubleClick\(e, row, col\)\}/);
 });
