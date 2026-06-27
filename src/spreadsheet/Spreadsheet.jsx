@@ -12,7 +12,7 @@ import {NativeContextMenu} from './components/NativeContextMenu.jsx';
 import {RowFragment} from './components/RowFragment.jsx';
 import {SheetTabs} from './components/SheetTabs.jsx';
 import {SpreadsheetToolbar} from './components/SpreadsheetToolbar.jsx';
-import {CommandType, NumberFormatType, createImportHtmlTableCommand, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, getCellRawValue, getMergeAtCell, getValidationRulesForCell, getVisibleRowsForSheet, rangeToHtmlTable, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook, validateCellValue} from './engine/index.js';
+import {CommandType, NumberFormatType, createImportHtmlTableCommand, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, getCellRawValue, getMergeAtCell, getValidationRulesForCell, getVisibleRowsForSheet, normalizeName, rangeToHtmlTable, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook, validateCellValue} from './engine/index.js';
 import {cellAddress, cellKey, columnName} from './model/address.js';
 import {DEFAULT_GRID_CONFIG} from './model/constants.js';
 import {createDefaultCellData, createDefaultColWidths, createDefaultRowHeights, defaultCellValue} from './model/defaultData.js';
@@ -73,6 +73,10 @@ function normalizePromptNumber(input) {
   if (!text) return null;
   const number = Number(text);
   return Number.isFinite(number) ? number : NaN;
+}
+
+function defaultRangeName(selection) {
+  return `Range_${cellAddress(selection.r1, selection.c1)}_${cellAddress(selection.r2, selection.c2)}`.replace(/[^A-Za-z0-9_]/g, '_');
 }
 
 export function Spreadsheet({
@@ -642,6 +646,43 @@ export function Spreadsheet({
       label: 'Clear validation',
     }, 'Cleared validation', 'metadata');
   }, [activeCell, activeSheet, committedSelection, commitWorkbookStructureCommand, showToast]);
+  const nameSelection = useCallback(() => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    const input = typeof window === 'undefined' ? defaultRangeName(selection) : window.prompt('Named range', defaultRangeName(selection));
+    const name = input?.trim();
+    if (!name) return;
+    try {
+      const normalized = normalizeName(name);
+      commitWorkbookStructureCommand({
+        type: CommandType.SET_NAMED_RANGE,
+        name,
+        sheetId: activeSheet.id,
+        range: selection,
+        label: `Name ${normalized}`,
+      }, `Named range ${normalized}`, 'metadata');
+    } catch (error) {
+      showToast(error?.message || 'Could not create named range', 'error');
+    }
+  }, [activeCell, activeSheet.id, committedSelection, commitWorkbookStructureCommand, showToast]);
+  const removeNamedRange = useCallback(() => {
+    if (!workbookRef.current.namedRanges.size) {
+      showToast('No named ranges', 'error');
+      return;
+    }
+    const fallbackName = Array.from(workbookRef.current.namedRanges.keys())[0];
+    const input = typeof window === 'undefined' ? fallbackName : window.prompt('Remove named range', fallbackName);
+    if (!input?.trim()) return;
+    const name = normalizeName(input);
+    if (!workbookRef.current.namedRanges.has(name)) {
+      showToast('Named range not found', 'error');
+      return;
+    }
+    commitWorkbookStructureCommand({
+      type: CommandType.REMOVE_NAMED_RANGE,
+      name,
+      label: `Remove ${name}`,
+    }, `Removed named range ${name}`, 'metadata');
+  }, [commitWorkbookStructureCommand, showToast]);
   const resizeColumn = useCallback((col, size) => {
     const command = {type: CommandType.RESIZE_COLUMN, col, size};
     const nextWorkbook = dispatchCommand(workbookRef.current, command);
@@ -923,6 +964,8 @@ export function Spreadsheet({
           onValidateNumber={applyNumberValidation}
           onValidateList={applyListValidation}
           onClearValidation={clearValidation}
+          onNameSelection={nameSelection}
+          onRemoveNamedRange={removeNamedRange}
           onWidenActiveColumn={() => resizeColumn(activeCell.col, colMetrics.size(activeCell.col) + 20)}
           onTallerActiveRow={() => resizeRow(activeCell.row, rowMetrics.size(activeCell.row) + 6)}
           themeName={themeName}
