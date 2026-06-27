@@ -20,6 +20,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Row and column resizing with transient dimensions stored in refs
 - Editable cells via double-click, `Enter`, typing, formula bar, and context menu
 - Undo/redo command history for engine-backed cell edits and clears
+- Engine-backed copy/paste for TSV selection data
 - Formula evaluation for `SUM`, `AVERAGE` / `AVG`, `MIN`, `MAX`, `COUNT`, `CONCAT`, cell references, ranges, and basic arithmetic
 - Right-click context menu for edit, clear, copy, resize, and sample formula actions
 - Live inspector panel showing mounted cells, sparse overrides, effect-registered geometry, and approximate FPS

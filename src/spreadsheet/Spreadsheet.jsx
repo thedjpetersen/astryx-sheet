@@ -11,7 +11,7 @@ import {InspectorPanel} from './components/InspectorPanel.jsx';
 import {NativeContextMenu} from './components/NativeContextMenu.jsx';
 import {RowFragment} from './components/RowFragment.jsx';
 import {SpreadsheetToolbar} from './components/SpreadsheetToolbar.jsx';
-import {CommandType, createSheetDataRef, createWorkbook, dispatchCommand, getActiveSheet, redo as redoWorkbook, undo as undoWorkbook} from './engine/index.js';
+import {CommandType, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, getActiveSheet, rangeToTsv, redo as redoWorkbook, undo as undoWorkbook} from './engine/index.js';
 import {cellAddress, cellKey, columnName} from './model/address.js';
 import {DEFAULT_GRID_CONFIG} from './model/constants.js';
 import {createDefaultCellData, createDefaultColWidths, createDefaultRowHeights, defaultCellValue} from './model/defaultData.js';
@@ -164,6 +164,33 @@ export function Spreadsheet({
   }, [showToast, syncFormulaDraftFromWorkbook]);
   const undoLastCommand = useCallback(() => navigateHistory(undoWorkbook, 'Undo'), [navigateHistory]);
   const redoLastCommand = useCallback(() => navigateHistory(redoWorkbook, 'Redo'), [navigateHistory]);
+  const copySelectionToClipboard = useCallback(() => {
+    if (!navigator.clipboard?.writeText) {
+      showToast('Clipboard blocked', 'error');
+      return;
+    }
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    const text = rangeToTsv(workbookRef.current, selection, {getDefaultCellValue});
+    navigator.clipboard.writeText(text).then(
+      () => showToast(`Copied ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`),
+      () => showToast('Clipboard blocked', 'error'),
+    );
+  }, [activeCell, committedSelection, getDefaultCellValue, showToast]);
+  const pasteClipboardAtActiveCell = useCallback(() => {
+    if (!navigator.clipboard?.readText) {
+      showToast('Clipboard blocked', 'error');
+      return;
+    }
+    navigator.clipboard.readText().then((text) => {
+      if (!text) return;
+      const nextWorkbook = dispatchCommand(workbookRef.current, createPasteTsvCommand(text, activeCell));
+      workbookRef.current = nextWorkbook;
+      setWorkbook(nextWorkbook);
+      setDataVersion((v) => v + 1);
+      syncFormulaDraftFromWorkbook(nextWorkbook);
+      showToast('Pasted cells');
+    }, () => showToast('Clipboard blocked', 'error'));
+  }, [activeCell, showToast, syncFormulaDraftFromWorkbook]);
   const setActiveCell = useCallback((point) => {
     const nextPoint = clampPoint(point, gridConfig);
     setActiveCellState(nextPoint);
@@ -336,13 +363,15 @@ export function Spreadsheet({
       const key = event.key.toLowerCase();
       if ((event.metaKey || event.ctrlKey) && key === 'z') { event.preventDefault(); event.shiftKey ? redoLastCommand() : undoLastCommand(); return; }
       if ((event.metaKey || event.ctrlKey) && key === 'y') { event.preventDefault(); redoLastCommand(); return; }
+      if ((event.metaKey || event.ctrlKey) && key === 'c') { event.preventDefault(); copySelectionToClipboard(); return; }
+      if ((event.metaKey || event.ctrlKey) && key === 'v') { event.preventDefault(); pasteClipboardAtActiveCell(); return; }
       if (event.key === 'Enter') { event.preventDefault(); openEditor(activeCell.row, activeCell.col); }
       else if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); clearSelection(); }
       else if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); openEditor(activeCell.row, activeCell.col, event.key); }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activeCell, editor, openEditor, clearSelection, redoLastCommand, undoLastCommand]);
+  }, [activeCell, editor, openEditor, clearSelection, copySelectionToClipboard, pasteClipboardAtActiveCell, redoLastCommand, undoLastCommand]);
 
   const onScroll = useCallback((event) => {
     const {scrollLeft, scrollTop} = event.currentTarget;
@@ -441,6 +470,8 @@ export function Spreadsheet({
           canRedo={workbook.future.length > 0}
           onUndo={undoLastCommand}
           onRedo={redoLastCommand}
+          onCopySelection={copySelectionToClipboard}
+          onPasteClipboard={pasteClipboardAtActiveCell}
           onEditActiveCell={() => openEditor(activeCell.row, activeCell.col)}
           onClearSelection={clearSelection}
           onWidenActiveColumn={() => { colWidthsRef.current.set(activeCell.col, colMetrics.size(activeCell.col) + 20); setDimensionVersion((v) => v + 1); }}

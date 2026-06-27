@@ -27,6 +27,8 @@ export function SpreadsheetToolbar({
   canRedo,
   onUndo,
   onRedo,
+  onCopySelection,
+  onPasteClipboard,
   onEditActiveCell,
   onClearSelection,
   onWidenActiveColumn,
@@ -77,6 +79,8 @@ export function SpreadsheetToolbar({
       <div className="ribbon-tools">
         <Button label="Undo" variant="secondary" size="sm" onClick={onUndo} isDisabled={!canUndo} />
         <Button label="Redo" variant="secondary" size="sm" onClick={onRedo} isDisabled={!canRedo} />
+        <Button label="Copy" variant="secondary" size="sm" onClick={onCopySelection} />
+        <Button label="Paste" variant="secondary" size="sm" onClick={onPasteClipboard} />
         <Button label="Edit cell" variant="secondary" size="sm" onClick={onEditActiveCell} />
         <Button label="Clear" variant="secondary" size="sm" onClick={onClearSelection} />
         <Button label="Widen column" variant="secondary" size="sm" onClick={onWidenActiveColumn} />
