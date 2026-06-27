@@ -5,7 +5,7 @@ Astryx Sheet is now split as a source package instead of a single demo file. The
 ## Public Surface
 
 - `src/index.js` is the package entry point.
-- `Spreadsheet` is the embeddable component. It accepts grid sizing, initial cell data, initial row/column dimensions, initial merged ranges, initial data validation rules, theme defaults or controlled theme values, toolbar and inspector visibility flags, cell/selection callbacks, and a workbook-level change callback for host persistence.
+- `Spreadsheet` is the embeddable component. It accepts grid sizing, initial cell data, initial row/column dimensions, initial merged ranges, initial data validation rules, theme defaults or controlled theme values, toolbar visibility flags, cell/selection callbacks, and a workbook-level change callback for host persistence.
 - `createWorkbookController` is the headless workbook runtime for applications that need command dispatch, subscriptions, history, recalculation, and snapshots without React.
 - `createWorkbookPersistence` binds a controller to host storage for snapshot save/load flows without depending on browser globals.
 - Command journal helpers record and replay controller commands for collaboration, audit logging, and host-side synchronization experiments.
@@ -15,7 +15,7 @@ Astryx Sheet is now split as a source package instead of a single demo file. The
 
 - `src/app/` contains demo application wiring and Astryx theme registration.
 - `src/spreadsheet/Spreadsheet.jsx` owns workbook interaction orchestration: scroll virtualization, selection, editing, resizing, formula bar state, sheet-tab commands, workbook metadata commands, and context menu actions.
-- `src/spreadsheet/components/` contains replaceable UI pieces such as cells, row fragments, sheet tabs, the toolbar, function picker, context menu, and inspector panel.
+- `src/spreadsheet/components/` contains replaceable UI pieces such as cells, row fragments, sheet tabs, the toolbar, function picker, and context menu.
 - `src/spreadsheet/engine/` contains the React-independent workbook core: sheets, sparse cells, a headless controller, persistence and journal helpers, commands, undo/redo, clipboard helpers, dependency graph utilities, and snapshot serialization.
 - `src/spreadsheet/model/` contains spreadsheet primitives: addresses, default data, formulas, dimensions, selections, and initial-state normalization.
 - `src/hooks/` contains reusable React infrastructure for requestAnimationFrame scheduling, element measurement, and controlled/uncontrolled props.

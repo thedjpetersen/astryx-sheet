@@ -1,4 +1,4 @@
-import React, {memo, useLayoutEffect, useRef} from 'react';
+import React, {memo} from 'react';
 import {getCellDisplayValue, getMergeAtCell, validateCellValue} from '../engine/index.js';
 import {cellKey} from '../model/address.js';
 import {defaultCellValue} from '../model/defaultData.js';
@@ -13,8 +13,6 @@ export const RowFragment = memo(function RowFragment({
   rowMetrics,
   firstRenderedRow,
   firstRenderedCol,
-  registerRow,
-  registerCell,
   activeCell,
   workbook,
   sheetId,
@@ -25,14 +23,8 @@ export const RowFragment = memo(function RowFragment({
   onContextMenu,
   onDoubleClick,
 }) {
-  const ref = useRef(null);
-  useLayoutEffect(() => {
-    registerRow(row, {y, height, el: ref.current});
-    return () => registerRow(row, null);
-  }, [row, y, height, registerRow]);
-
   return (
-    <div ref={ref} className="row-fragment" style={{top: y, left: 0, height, width: colMetrics.total()}}>
+    <div className="row-fragment" style={{top: y, left: 0, height, width: colMetrics.total()}}>
       {columns.map((col) => {
         const sheet = workbook?.sheets.get(sheetId);
         const merge = sheet ? getMergeAtCell(sheet, row, col) : null;
@@ -65,7 +57,6 @@ export const RowFragment = memo(function RowFragment({
             row={cellRow}
             col={cellCol}
             x={x}
-            y={absoluteY}
             top={top}
             width={width}
             height={cellHeight}
@@ -75,7 +66,6 @@ export const RowFragment = memo(function RowFragment({
             mergeRange={mergeRange}
             active={active}
             edited={edited}
-            registerCell={registerCell}
             onPointerDown={onPointerDown}
             onContextMenu={onContextMenu}
             onDoubleClick={onDoubleClick}

@@ -4,7 +4,7 @@
 
 - Split the original single-file demo into an embeddable source package: `src/main.jsx` is now only the Vite bootstrap, while `src/index.js` exposes package APIs.
 - Moved theme registration into `src/app/`, reusable React utilities into `src/hooks/`, UI pieces into `src/spreadsheet/components/`, and model helpers into `src/spreadsheet/model/`.
-- Added `Spreadsheet` props for host integration: grid sizing, initial sparse cell data, initial row/column dimensions, controlled or uncontrolled theme state, toolbar and inspector visibility, theme wrapping, and cell/selection callbacks.
+- Added `Spreadsheet` props for host integration: grid sizing, initial sparse cell data, initial row/column dimensions, controlled or uncontrolled theme state, toolbar visibility, theme wrapping, and cell/selection callbacks.
 - Added the first React-independent workbook engine in `src/spreadsheet/engine/`.
 - Covered the engine with `node:test` tests for sparse edits, formula display, undo/redo, TSV paste/copy, clearing ranges, resizing, and snapshot round trips.
 - Routed spreadsheet cell edits and selection clears through the workbook command dispatcher while preserving the virtual grid's ref-driven resize path.
@@ -17,7 +17,6 @@
 - Added cached recalculation helpers for full-sheet and dirty formula updates.
 - Added a dispatch-with-recalculation engine API that derives changed cells from commands and refreshes dependent formula caches.
 - Connected React cell edits, clears, paste actions, and history navigation to the recalculating engine path.
-- Surfaced formula count, cached formula count, and formula error metrics in the inspector.
 - Added engine-level display formatting and undoable range format commands.
 - Moved rendered grid display through the engine display formatter and added toolbar actions for common formats.
 - Added undoable, header-aware range sorting in the engine.
@@ -26,10 +25,9 @@
 - Added workbook-level named ranges with command history and snapshot serialization.
 - Integrated named ranges into formula expansion, dependency discovery, and cached recalculation.
 - Added sheet filter state, criteria evaluation, visible-row selectors, command history, and snapshot serialization.
-- Connected filter state to the React toolbar, virtualized row metrics, and inspector metrics.
+- Connected filter state to the React toolbar and virtualized row metrics.
 - Added merged range metadata with overlap validation, command history, selectors, and snapshot serialization.
 - Added data validation rules with command history, selectors, predicate evaluation, and snapshot serialization.
-- Surfaced merged range, validation rule, and named range counts in the inspector.
 - Added active-sheet commands, fixed generated sheet id collisions, and preserved the previous active sheet when undoing sheet creation.
 - Added a modular sheet-tab React component for switching, adding, renaming, and removing workbook sheets.
 - Added an `onWorkbookChange` callback so embedded hosts can observe workbook-level changes beyond cell edits.

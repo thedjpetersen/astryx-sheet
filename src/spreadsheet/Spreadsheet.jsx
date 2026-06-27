@@ -7,13 +7,12 @@ import {useControllableState} from '../hooks/useControllableState.js';
 import {useElementSize} from '../hooks/useElementSize.js';
 import {useRafCallback} from '../hooks/useRafCallback.js';
 import {FunctionPicker} from './components/FunctionPicker.jsx';
-import {InspectorPanel} from './components/InspectorPanel.jsx';
 import {NativeContextMenu} from './components/NativeContextMenu.jsx';
 import {RowFragment} from './components/RowFragment.jsx';
 import {SheetTabs} from './components/SheetTabs.jsx';
 import {SpreadsheetToolbar} from './components/SpreadsheetToolbar.jsx';
 import {CommandType, NumberFormatType, createImportHtmlTableCommand, createPasteTsvCommand, createSheetDataRef, createWorkbook, dispatchCommand, dispatchCommandWithRecalculation, getActiveSheet, getCellRawValue, getMergeAtCell, getValidationRulesForCell, getVisibleRowsForSheet, normalizeName, rangeToHtmlTable, rangeToTsv, recalculateWorkbook, redo as redoWorkbook, undo as undoWorkbook, validateCellValue} from './engine/index.js';
-import {cellAddress, cellKey, columnName} from './model/address.js';
+import {cellAddress, columnName} from './model/address.js';
 import {DEFAULT_GRID_CONFIG} from './model/constants.js';
 import {createDefaultCellData, createDefaultColWidths, createDefaultRowHeights, defaultCellValue} from './model/defaultData.js';
 import {readCell} from './model/formulas.js';
@@ -95,9 +94,6 @@ export function Spreadsheet({
   defaultDarkMode = false,
   darkMode: controlledDarkMode,
   onDarkModeChange,
-  defaultShowInspector = true,
-  showInspector: controlledShowInspector,
-  onShowInspectorChange,
   defaultCompactRows = false,
   compactRows: controlledCompactRows,
   onCompactRowsChange,
@@ -121,6 +117,7 @@ export function Spreadsheet({
   const selectionOverlayRef = useRef(null);
   const resizeGuideRef = useRef(null);
   const editorRef = useRef(null);
+  const editorSessionRef = useRef(0);
   const toast = useToast();
 
   const gridConfig = useMemo(() => ({...DEFAULT_GRID_CONFIG, ...gridConfigOverride}), [gridConfigOverride]);
@@ -137,8 +134,6 @@ export function Spreadsheet({
   } = gridConfig;
   const initialPoint = clampPoint({row: 1, col: 1}, gridConfig);
 
-  const cellMetaRef = useRef(new Map());
-  const rowMetaRef = useRef(new Map());
   const [workbook, setWorkbook] = useState(() => createWorkbook({
     sheets: [{
       id: 'sheet-1',
@@ -164,7 +159,6 @@ export function Spreadsheet({
   const scrollRef = useRef({left: 0, top: 0});
   const selectionRef = useRef({dragging: false, anchor: initialPoint, extent: initialPoint});
   const resizeRef = useRef(null);
-  const frameCounterRef = useRef({frames: 0, last: performance.now()});
 
   const [dimensionVersion, setDimensionVersion] = useState(0);
   const [dataVersion, setDataVersion] = useState(0);
@@ -180,10 +174,8 @@ export function Spreadsheet({
   const [editor, setEditor] = useState(null);
   const [menu, setMenu] = useState({open: false, x: 0, y: 0, row: 0, col: 0});
   const [formulaPickerOpen, setFormulaPickerOpen] = useState(false);
-  const [fps, setFps] = useState(60);
   const [themeName, setThemeName] = useControllableState({value: controlledThemeName, defaultValue: defaultThemeName, onChange: onThemeNameChange});
   const [darkMode, setDarkMode] = useControllableState({value: controlledDarkMode, defaultValue: defaultDarkMode, onChange: onDarkModeChange});
-  const [showInspector, setShowInspector] = useControllableState({value: controlledShowInspector, defaultValue: defaultShowInspector, onChange: onShowInspectorChange});
   const [compactRows, setCompactRows] = useControllableState({value: controlledCompactRows, defaultValue: defaultCompactRows, onChange: onCompactRowsChange});
   const [highContrastSelection, setHighContrastSelection] = useControllableState({
     value: controlledHighContrastSelection,
@@ -397,15 +389,6 @@ export function Spreadsheet({
     setDataVersion((v) => v + 1);
     return true;
   }, [emitWorkbookChange, getDefaultCellValue, onCellChange, validateEditCells]);
-  const registerCell = useCallback((row, col, rect) => {
-    const key = cellKey(row, col);
-    if (rect) cellMetaRef.current.set(key, rect);
-    else cellMetaRef.current.delete(key);
-  }, []);
-  const registerRow = useCallback((row, rect) => {
-    if (rect) rowMetaRef.current.set(row, rect);
-    else rowMetaRef.current.delete(row);
-  }, []);
   const calculateView = useCallback(() => {
     const {left, top} = scrollRef.current;
     const width = viewportRef.current?.clientWidth || size.width || 1;
@@ -441,7 +424,13 @@ export function Spreadsheet({
     scheduleDrawSelection();
   }, [cellDataRef, gridConfig, getDefaultCellValue, setActiveCell, setCommittedSelection, scheduleDrawSelection]);
   const openEditor = useCallback((row, col, seed) => {
-    setEditor({row, col, value: seed ?? readCell(cellDataRef, row, col, getDefaultCellValue)});
+    setEditor({
+      row,
+      col,
+      value: seed ?? readCell(cellDataRef, row, col, getDefaultCellValue),
+      selectAll: seed == null,
+      sessionId: ++editorSessionRef.current,
+    });
     setMenu((m) => ({...m, open: false}));
     setFormulaPickerOpen(false);
   }, [cellDataRef, getDefaultCellValue]);
@@ -715,21 +704,16 @@ export function Spreadsheet({
   }, [emitWorkbookChange]);
 
   useLayoutEffect(() => { calculateView(); drawSelectionOverlay(); }, [calculateView, drawSelectionOverlay, dimensionVersion, size.width, size.height]);
-  useEffect(() => { if (editor && editorRef.current) { editorRef.current.focus(); editorRef.current.select(); } }, [editor]);
   useEffect(() => {
-    let raf = 0;
-    const tick = (now) => {
-      const counter = frameCounterRef.current;
-      counter.frames++;
-      if (now - counter.last > 600) {
-        setFps(Math.round((counter.frames * 1000) / (now - counter.last)));
-        counter.frames = 0; counter.last = now;
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, []);
+    if (!editor || !editorRef.current) return;
+    editorRef.current.focus();
+    if (editor.selectAll) {
+      editorRef.current.select();
+      return;
+    }
+    const position = String(editor.value ?? '').length;
+    editorRef.current.setSelectionRange(position, position);
+  }, [editor?.sessionId]);
   useEffect(() => {
     const onPointerMove = (event) => {
       if (selectionRef.current.dragging) {
@@ -897,23 +881,6 @@ export function Spreadsheet({
   const columns = useMemo(() => Array.from({length: Math.max(0, view.colEnd - view.colStart + 1)}, (_, i) => view.colStart + i), [view.colStart, view.colEnd]);
   const firstRenderedRow = renderedRows[0] ?? view.rowStart;
   const firstRenderedCol = columns[0] ?? view.colStart;
-  const calculationStats = useMemo(() => {
-    let formulas = 0;
-    let cached = 0;
-    let errors = 0;
-    for (const cell of activeSheet.cells.values()) {
-      if (!cell?.formula) continue;
-      formulas++;
-      if ('computedValue' in cell || 'displayValue' in cell) cached++;
-      if (cell.error) errors++;
-    }
-    return {formulas, cached, errors};
-  }, [activeSheet]);
-  const structureStats = useMemo(() => ({
-    merges: activeSheet.merges.size,
-    validations: activeSheet.validations.size,
-    namedRanges: workbook.namedRanges.size,
-  }), [activeSheet, workbook]);
   const totalWidth = colMetrics.total();
   const totalHeight = rowMetrics.total();
   const activeAddress = cellAddress(activeCell.row, activeCell.col);
@@ -921,7 +888,6 @@ export function Spreadsheet({
   const appClassName = [
     'app',
     `theme-${themeName}`,
-    showInspector ? '' : 'hide-inspector',
     highContrastSelection ? 'high-contrast-selection' : '',
     showToolbar ? '' : 'toolbar-hidden',
     className,
@@ -973,8 +939,6 @@ export function Spreadsheet({
           darkMode={darkMode}
           onDarkModeChange={setDarkMode}
           activeTheme={activeTheme}
-          showInspector={showInspector}
-          onShowInspectorChange={setShowInspector}
           compactRows={compactRows}
           onCompactRowsChange={setCompactRows}
           highContrastSelection={highContrastSelection}
@@ -1015,8 +979,6 @@ export function Spreadsheet({
                       rowMetrics={rowMetrics}
                       firstRenderedRow={firstRenderedRow}
                       firstRenderedCol={firstRenderedCol}
-                      registerRow={registerRow}
-                      registerCell={registerCell}
                       activeCell={activeCell}
                       workbook={workbook}
                       sheetId={activeSheet.id}
@@ -1044,25 +1006,6 @@ export function Spreadsheet({
             onRemoveActiveSheet={removeActiveSheet}
           />
         </div>
-        {showInspector && (
-          <InspectorPanel
-            gridConfig={gridConfig}
-            getDefaultCellValue={getDefaultCellValue}
-            view={view}
-            activeCell={activeCell}
-            selection={committedSelection}
-            rowOverrides={rowOverrides}
-            colOverrides={colOverrides}
-            cellMetaRef={cellMetaRef}
-            rowMetaRef={rowMetaRef}
-            edits={cellDataRef.current.size}
-            calculationStats={calculationStats}
-            filterStats={{active: activeSheet.filters.size, hiddenRows: filteredRows?.hiddenRows?.length || 0}}
-            structureStats={structureStats}
-            fps={fps}
-            dataRef={cellDataRef}
-          />
-        )}
       </main>
       <NativeContextMenu menu={menu} onAction={handleMenuAction} />
     </div>

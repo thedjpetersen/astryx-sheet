@@ -1,13 +1,7 @@
-import React, {memo, useLayoutEffect, useMemo, useRef} from 'react';
+import React, {memo, useMemo} from 'react';
 import {cellAddress} from '../model/address.js';
 
-export const Cell = memo(function Cell({row, col, x, y, top = 0, width, height, value, rawValue, validation, mergeRange, active, edited, registerCell, onPointerDown, onContextMenu, onDoubleClick}) {
-  const ref = useRef(null);
-  useLayoutEffect(() => {
-    registerCell(row, col, {x, y, width, height, el: ref.current});
-    return () => registerCell(row, col, null);
-  }, [row, col, x, y, width, height, registerCell]);
-
+export const Cell = memo(function Cell({row, col, x, top = 0, width, height, value, rawValue, validation, mergeRange, active, edited, onPointerDown, onContextMenu, onDoubleClick}) {
   const status = String(value).toLowerCase();
   const validationMessage = validation?.valid === false ? validation.failures?.[0]?.message || 'Invalid value' : '';
   const className = `cell ${active ? 'active-cell' : ''} ${edited ? 'edited-cell' : ''} ${validationMessage ? 'invalid-cell' : ''} ${mergeRange ? 'merged-cell' : ''} ${String(rawValue).trim().startsWith('=') ? 'formula-cell' : ''}`;
@@ -16,7 +10,6 @@ export const Cell = memo(function Cell({row, col, x, y, top = 0, width, height, 
   ), [col, mergeRange, rawValue, row, validationMessage]);
   return (
     <div
-      ref={ref}
       className={className}
       aria-invalid={validationMessage ? 'true' : undefined}
       data-row={row}

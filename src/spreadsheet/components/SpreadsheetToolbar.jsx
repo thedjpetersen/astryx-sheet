@@ -9,7 +9,64 @@ import {Selector} from '@astryxdesign/core/Selector';
 import {Token} from '@astryxdesign/core/Token';
 import {Kbd} from '@astryxdesign/core/Kbd';
 import {Tooltip} from '@astryxdesign/core/Tooltip';
+import {
+  ArrowDownAZ,
+  ArrowUpZA,
+  CalendarDays,
+  ClipboardPaste,
+  Combine,
+  Contrast,
+  Copy,
+  DollarSign,
+  Eraser,
+  Filter,
+  FilterX,
+  Hash,
+  ListChecks,
+  ListX,
+  Moon,
+  Pencil,
+  Percent,
+  Redo2,
+  Rows3,
+  Split,
+  Tag,
+  TagX,
+  Undo2,
+  UnfoldHorizontal,
+  UnfoldVertical,
+} from 'lucide-react';
 import {THEME_OPTIONS} from '../../app/themes.js';
+
+const iconProps = {size: 16, strokeWidth: 2, 'aria-hidden': true};
+
+function icon(IconComponent, size = 16) {
+  return <IconComponent {...iconProps} size={size} />;
+}
+
+function RibbonGroup({label, children, className = ''}) {
+  return (
+    <section className={`ribbon-group ${className}`} aria-label={label}>
+      <div className="ribbon-group-actions">{children}</div>
+      <div className="ribbon-group-label">{label}</div>
+    </section>
+  );
+}
+
+function RibbonButton({label, icon: buttonIcon, onClick, isDisabled, children, size = 'small'}) {
+  return (
+    <button
+      className={`ribbon-command ${size}`}
+      type="button"
+      onClick={onClick}
+      disabled={isDisabled}
+      title={label}
+      aria-label={label}>
+      <span className="ribbon-command-icon">{buttonIcon}</span>
+      {size === 'icon' ? null : <span className="ribbon-command-label">{children ?? label}</span>}
+    </button>
+  );
+}
 
 export function SpreadsheetToolbar({
   title,
@@ -53,8 +110,6 @@ export function SpreadsheetToolbar({
   darkMode,
   onDarkModeChange,
   activeTheme,
-  showInspector,
-  onShowInspectorChange,
   compactRows,
   onCompactRowsChange,
   highContrastSelection,
@@ -69,6 +124,13 @@ export function SpreadsheetToolbar({
       <div className="title">
         <Heading level={1}>{title}</Heading>
         {subtitle ? <Text type="supporting" display="block">{subtitle}</Text> : null}
+      </div>
+      <div className="ribbon-tabs" aria-label="Ribbon tabs">
+        <span className="ribbon-tab file">File</span>
+        <span className="ribbon-tab active">Home</span>
+        <span className="ribbon-tab">Insert</span>
+        <span className="ribbon-tab">Data</span>
+        <span className="ribbon-tab">View</span>
       </div>
       <div className="formula-wrap">
         <Badge variant="purple" label={activeAddress} />
@@ -91,39 +153,54 @@ export function SpreadsheetToolbar({
           <Token color="green" label={`${mountedCount.toLocaleString()} mounted`} />
         </div>
       ) : null}
-      <div className="ribbon-tools">
-        <Button label="Undo" variant="secondary" size="sm" onClick={onUndo} isDisabled={!canUndo} />
-        <Button label="Redo" variant="secondary" size="sm" onClick={onRedo} isDisabled={!canRedo} />
-        <Button label="Copy" variant="secondary" size="sm" onClick={onCopySelection} />
-        <Button label="Paste" variant="secondary" size="sm" onClick={onPasteClipboard} />
-        <Button label="Edit cell" variant="secondary" size="sm" onClick={onEditActiveCell} />
-        <Button label="Clear" variant="secondary" size="sm" onClick={onClearSelection} />
-        <Button label="Number" variant="secondary" size="sm" onClick={onFormatNumber} />
-        <Button label="$" variant="secondary" size="sm" onClick={onFormatCurrency} />
-        <Button label="%" variant="secondary" size="sm" onClick={onFormatPercent} />
-        <Button label="Date" variant="secondary" size="sm" onClick={onFormatDate} />
-        <Button label="Sort A-Z" variant="secondary" size="sm" onClick={onSortAscending} />
-        <Button label="Sort Z-A" variant="secondary" size="sm" onClick={onSortDescending} />
-        <Button label="Filter" variant="secondary" size="sm" onClick={onFilterSelection} />
-        <Button label="Clear filter" variant="secondary" size="sm" onClick={onClearFilter} />
-        <Button label="Merge" variant="secondary" size="sm" onClick={onMergeSelection} />
-        <Button label="Unmerge" variant="secondary" size="sm" onClick={onUnmergeSelection} />
-        <Button label="Validate #" variant="secondary" size="sm" onClick={onValidateNumber} />
-        <Button label="Validate list" variant="secondary" size="sm" onClick={onValidateList} />
-        <Button label="Clear rule" variant="secondary" size="sm" onClick={onClearValidation} />
-        <Button label="Name range" variant="secondary" size="sm" onClick={onNameSelection} />
-        <Button label="Remove name" variant="secondary" size="sm" onClick={onRemoveNamedRange} />
-        <Button label="Widen column" variant="secondary" size="sm" onClick={onWidenActiveColumn} />
-        <Button label="Taller row" variant="secondary" size="sm" onClick={onTallerActiveRow} />
-        <span className="toolbar-spacer" />
+      <div className="ribbon-tools" aria-label="Spreadsheet commands">
+        <RibbonGroup label="Clipboard">
+          <RibbonButton label="Paste" icon={icon(ClipboardPaste, 24)} onClick={onPasteClipboard} size="large" />
+          <RibbonButton label="Copy" icon={icon(Copy)} onClick={onCopySelection} />
+        </RibbonGroup>
+        <RibbonGroup label="Edit">
+          <RibbonButton label="Undo" icon={icon(Undo2)} onClick={onUndo} isDisabled={!canUndo} size="icon" />
+          <RibbonButton label="Redo" icon={icon(Redo2)} onClick={onRedo} isDisabled={!canRedo} size="icon" />
+          <RibbonButton label="Edit" icon={icon(Pencil)} onClick={onEditActiveCell} />
+          <RibbonButton label="Clear" icon={icon(Eraser)} onClick={onClearSelection} />
+        </RibbonGroup>
+        <RibbonGroup label="Number">
+          <RibbonButton label="Number" icon={icon(Hash)} onClick={onFormatNumber} />
+          <RibbonButton label="Currency" icon={icon(DollarSign)} onClick={onFormatCurrency}>Currency</RibbonButton>
+          <RibbonButton label="Percent" icon={icon(Percent)} onClick={onFormatPercent}>Percent</RibbonButton>
+          <RibbonButton label="Date" icon={icon(CalendarDays)} onClick={onFormatDate} />
+        </RibbonGroup>
+        <RibbonGroup label="Data">
+          <RibbonButton label="Sort A-Z" icon={icon(ArrowDownAZ)} onClick={onSortAscending} />
+          <RibbonButton label="Sort Z-A" icon={icon(ArrowUpZA)} onClick={onSortDescending} />
+          <RibbonButton label="Filter" icon={icon(Filter)} onClick={onFilterSelection} />
+          <RibbonButton label="Clear filter" icon={icon(FilterX)} onClick={onClearFilter}>Clear</RibbonButton>
+        </RibbonGroup>
+        <RibbonGroup label="Cells">
+          <RibbonButton label="Merge" icon={icon(Combine)} onClick={onMergeSelection} />
+          <RibbonButton label="Unmerge" icon={icon(Split)} onClick={onUnmergeSelection} />
+          <RibbonButton label="Widen column" icon={icon(UnfoldHorizontal)} onClick={onWidenActiveColumn}>Column</RibbonButton>
+          <RibbonButton label="Taller row" icon={icon(UnfoldVertical)} onClick={onTallerActiveRow}>Row</RibbonButton>
+        </RibbonGroup>
+        <RibbonGroup label="Rules">
+          <RibbonButton label="Number rule" icon={icon(ListChecks)} onClick={onValidateNumber}>Number</RibbonButton>
+          <RibbonButton label="List rule" icon={icon(Rows3)} onClick={onValidateList}>List</RibbonButton>
+          <RibbonButton label="Clear rule" icon={icon(ListX)} onClick={onClearValidation}>Clear</RibbonButton>
+        </RibbonGroup>
+        <RibbonGroup label="Names">
+          <RibbonButton label="Name" icon={icon(Tag)} onClick={onNameSelection} />
+          <RibbonButton label="Remove name" icon={icon(TagX)} onClick={onRemoveNamedRange}>Remove</RibbonButton>
+        </RibbonGroup>
+        <span className="toolbar-spacer" aria-hidden="true" />
         {showThemeControls ? (
-          <div className="options-group" aria-label="Demo options">
-            <Selector label="Theme" isLabelHidden options={THEME_OPTIONS} value={themeName} onChange={onThemeNameChange} size="sm" width={170} />
-            <Switch label="Dark" value={darkMode} onChange={onDarkModeChange} labelPosition="start" isDisabled={activeTheme.forceDark} />
-            <Switch label="Inspector" value={showInspector} onChange={onShowInspectorChange} labelPosition="start" />
-            <Switch label="Compact rows" value={compactRows} onChange={onCompactRowsChange} labelPosition="start" />
-            <Switch label="High contrast" value={highContrastSelection} onChange={onHighContrastSelectionChange} labelPosition="start" />
-          </div>
+          <RibbonGroup label="View" className="ribbon-group-view">
+            <div className="options-group" aria-label="View options">
+              <Selector label="Theme" isLabelHidden options={THEME_OPTIONS} value={themeName} onChange={onThemeNameChange} size="sm" width={150} />
+              <Switch label={<span className="switch-label"><Moon {...iconProps} />Dark</span>} value={darkMode} onChange={onDarkModeChange} labelPosition="start" isDisabled={activeTheme.forceDark} />
+              <Switch label={<span className="switch-label"><Rows3 {...iconProps} />Compact</span>} value={compactRows} onChange={onCompactRowsChange} labelPosition="start" />
+              <Switch label={<span className="switch-label"><Contrast {...iconProps} />Contrast</span>} value={highContrastSelection} onChange={onHighContrastSelectionChange} labelPosition="start" />
+            </div>
+          </RibbonGroup>
         ) : null}
         {showKeyboardHints ? <div className="kbd-hint"><Kbd keys="enter" /> edit <Kbd keys="backspace" /> clear</div> : null}
       </div>
