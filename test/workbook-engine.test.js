@@ -31,12 +31,18 @@ test('undo and redo restore previous workbook state', () => {
   let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
   workbook = dispatchCommand(workbook, {type: CommandType.SET_CELL, row: 1, col: 1, value: 'Original'});
   workbook = dispatchCommand(workbook, {type: CommandType.SET_CELL, row: 1, col: 1, value: 'Changed'});
+  workbook = dispatchCommand(workbook, {type: CommandType.RESIZE_COLUMN, col: 1, size: 180});
 
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 1), 'Changed');
+  assert.equal(workbook.sheets.get('sheet-1').colWidths.get(1), 180);
+  workbook = undo(workbook);
+  assert.equal(workbook.sheets.get('sheet-1').colWidths.has(1), false);
   workbook = undo(workbook);
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 1), 'Original');
   workbook = redo(workbook);
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 1), 'Changed');
+  workbook = redo(workbook);
+  assert.equal(workbook.sheets.get('sheet-1').colWidths.get(1), 180);
 });
 
 test('range clear and TSV paste are command-compatible', () => {

@@ -10,6 +10,7 @@
 - Routed spreadsheet cell edits and selection clears through the workbook command dispatcher while preserving the virtual grid's ref-driven resize path.
 - Added toolbar and keyboard undo/redo actions backed by the engine history.
 - Added toolbar and keyboard copy/paste actions backed by the engine TSV helpers.
+- Routed row and column size commits through engine resize commands while keeping drag feedback ref-driven.
 
 ## Current Direction
 
@@ -18,4 +19,4 @@ The package should grow around two public layers:
 - A workbook engine that can run without React and eventually own Excel-scale state, formulas, commands, history, import/export, and collaboration hooks.
 - A virtualized React grid that consumes the engine and can be embedded with or without the Astryx toolbar and themes.
 
-The next implementation pass should move resizing fully onto the engine dispatcher and add richer paste semantics for formulas, formatting, and larger clipboard payloads.
+The next implementation pass should add richer paste semantics for formulas, formatting, and larger clipboard payloads, then introduce command grouping so compound actions undo as one logical step.

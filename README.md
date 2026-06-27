@@ -18,6 +18,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Sparse `Map`-based row-height and column-width overrides
 - Drag multi-cell selection with a DOM overlay updated outside the React render loop
 - Row and column resizing with transient dimensions stored in refs
+- Undoable row and column size changes committed through the workbook engine
 - Editable cells via double-click, `Enter`, typing, formula bar, and context menu
 - Undo/redo command history for engine-backed cell edits and clears
 - Engine-backed copy/paste for TSV selection data

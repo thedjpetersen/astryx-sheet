@@ -281,6 +281,34 @@ export function Spreadsheet({
     if (activeCell.row >= selection.r1 && activeCell.row <= selection.r2 && activeCell.col >= selection.c1 && activeCell.col <= selection.c2) setFormulaDraft('');
     showToast(`Cleared ${count.toLocaleString()} cell${count === 1 ? '' : 's'}`);
   }, [committedSelection, activeCell, showToast, onCellChange]);
+  const resizeColumn = useCallback((col, size) => {
+    setWorkbook((currentWorkbook) => {
+      const nextWorkbook = dispatchCommand(currentWorkbook, {type: CommandType.RESIZE_COLUMN, col, size});
+      workbookRef.current = nextWorkbook;
+      return nextWorkbook;
+    });
+    setDimensionVersion((v) => v + 1);
+  }, []);
+  const resizeRow = useCallback((row, size) => {
+    setWorkbook((currentWorkbook) => {
+      const nextWorkbook = dispatchCommand(currentWorkbook, {type: CommandType.RESIZE_ROW, row, size});
+      workbookRef.current = nextWorkbook;
+      return nextWorkbook;
+    });
+    setDimensionVersion((v) => v + 1);
+  }, []);
+  const resetCellDimensions = useCallback((row, col) => {
+    const sheet = getActiveSheet(workbookRef.current);
+    if (!sheet.rowHeights.has(row) && !sheet.colWidths.has(col)) return;
+    setWorkbook((currentWorkbook) => {
+      let nextWorkbook = currentWorkbook;
+      if (getActiveSheet(nextWorkbook).colWidths.has(col)) nextWorkbook = dispatchCommand(nextWorkbook, {type: CommandType.RESIZE_COLUMN, col, size: null});
+      if (getActiveSheet(nextWorkbook).rowHeights.has(row)) nextWorkbook = dispatchCommand(nextWorkbook, {type: CommandType.RESIZE_ROW, row, size: null});
+      workbookRef.current = nextWorkbook;
+      return nextWorkbook;
+    });
+    setDimensionVersion((v) => v + 1);
+  }, []);
 
   useLayoutEffect(() => { calculateView(); drawSelectionOverlay(); }, [calculateView, drawSelectionOverlay, dimensionVersion, size.width, size.height]);
   useEffect(() => { if (editor && editorRef.current) { editorRef.current.focus(); editorRef.current.select(); } }, [editor]);
@@ -339,15 +367,25 @@ export function Spreadsheet({
         setCommittedSelection(normalizeSelection(selectionRef.current.anchor, selectionRef.current.extent));
       }
       if (resizeRef.current) {
+        const r = resizeRef.current;
+        const map = r.kind === 'col' ? colWidthsRef.current : rowHeightsRef.current;
+        const finalSize = map.get(r.index) ?? r.startSize;
+        if (r.hadOverride) map.set(r.index, r.startSize);
+        else map.delete(r.index);
+        if (finalSize !== r.startSize) {
+          if (r.kind === 'col') resizeColumn(r.index, finalSize);
+          else resizeRow(r.index, finalSize);
+        } else {
+          setDimensionVersion((v) => v + 1);
+        }
         resizeRef.current = null;
         if (resizeGuideRef.current) resizeGuideRef.current.style.display = 'none';
-        setDimensionVersion((v) => v + 1);
       }
     };
     window.addEventListener('pointermove', onPointerMove, {passive: true});
     window.addEventListener('pointerup', onPointerUp);
     return () => { window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp); };
-  }, [rowMetrics, colMetrics, scheduleDrawSelection, scheduleDimensionRender, headerHeight, sidebarWidth, setCommittedSelection]);
+  }, [rowMetrics, colMetrics, scheduleDrawSelection, scheduleDimensionRender, headerHeight, sidebarWidth, setCommittedSelection, resizeColumn, resizeRow]);
   useEffect(() => {
     const close = () => setMenu((m) => ({...m, open: false}));
     window.addEventListener('pointerdown', close);
@@ -413,8 +451,8 @@ export function Spreadsheet({
     const rect = viewportRef.current.getBoundingClientRect();
     openContextMenu(event, rowMetrics.indexAt(event.clientY - rect.top + scrollRef.current.top), colMetrics.indexAt(event.clientX - rect.left + scrollRef.current.left));
   }, [rowMetrics, colMetrics, openContextMenu]);
-  const beginColResize = useCallback((event, col) => { event.preventDefault(); event.stopPropagation(); resizeRef.current = {kind: 'col', index: col, startX: event.clientX, startSize: colMetrics.size(col)}; }, [colMetrics]);
-  const beginRowResize = useCallback((event, row) => { event.preventDefault(); event.stopPropagation(); resizeRef.current = {kind: 'row', index: row, startY: event.clientY, startSize: rowMetrics.size(row)}; }, [rowMetrics]);
+  const beginColResize = useCallback((event, col) => { event.preventDefault(); event.stopPropagation(); resizeRef.current = {kind: 'col', index: col, startX: event.clientX, startSize: colMetrics.size(col), hadOverride: colWidthsRef.current.has(col)}; }, [colMetrics]);
+  const beginRowResize = useCallback((event, row) => { event.preventDefault(); event.stopPropagation(); resizeRef.current = {kind: 'row', index: row, startY: event.clientY, startSize: rowMetrics.size(row), hadOverride: rowHeightsRef.current.has(row)}; }, [rowMetrics]);
   const commitFormula = useCallback(() => { setCell(activeCell.row, activeCell.col, formulaDraft); showToast(`Updated ${cellAddress(activeCell.row, activeCell.col)}`); }, [activeCell, formulaDraft, setCell, showToast]);
   const insertFunction = useCallback((name) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
@@ -428,12 +466,12 @@ export function Spreadsheet({
     if (action === 'clear') { setCell(row, col, ''); if (activeCell.row === row && activeCell.col === col) setFormulaDraft(''); showToast(`Cleared ${cellAddress(row, col)}`); }
     if (action === 'copy') navigator.clipboard?.writeText(readCell(cellDataRef, row, col, getDefaultCellValue)).then(() => showToast('Copied value'), () => showToast('Clipboard blocked', 'error'));
     if (action === 'address') navigator.clipboard?.writeText(cellAddress(row, col)).then(() => showToast('Copied address'), () => showToast('Clipboard blocked', 'error'));
-    if (action === 'widen') { colWidthsRef.current.set(col, colMetrics.size(col) + 20); setDimensionVersion((v) => v + 1); }
-    if (action === 'taller') { rowHeightsRef.current.set(row, rowMetrics.size(row) + 6); setDimensionVersion((v) => v + 1); }
-    if (action === 'resetSize') { colWidthsRef.current.delete(col); rowHeightsRef.current.delete(row); setDimensionVersion((v) => v + 1); }
+    if (action === 'widen') resizeColumn(col, colMetrics.size(col) + 20);
+    if (action === 'taller') resizeRow(row, rowMetrics.size(row) + 6);
+    if (action === 'resetSize') resetCellDimensions(row, col);
     if (action === 'sample') { const value = `=SUM(B${row + 1}:E${row + 1})`; setCell(row, col, value); if (activeCell.row === row && activeCell.col === col) setFormulaDraft(value); showToast(`Formula set in ${cellAddress(row, col)}`); }
     setMenu((m) => ({...m, open: false}));
-  }, [menu, openEditor, activeCell, showToast, colMetrics, rowMetrics, setCell, cellDataRef, getDefaultCellValue]);
+  }, [menu, openEditor, activeCell, showToast, colMetrics, rowMetrics, setCell, cellDataRef, getDefaultCellValue, resetCellDimensions, resizeColumn, resizeRow]);
 
   const rows = useMemo(() => Array.from({length: Math.max(0, view.rowEnd - view.rowStart + 1)}, (_, i) => view.rowStart + i), [view.rowStart, view.rowEnd]);
   const columns = useMemo(() => Array.from({length: Math.max(0, view.colEnd - view.colStart + 1)}, (_, i) => view.colStart + i), [view.colStart, view.colEnd]);
@@ -474,8 +512,8 @@ export function Spreadsheet({
           onPasteClipboard={pasteClipboardAtActiveCell}
           onEditActiveCell={() => openEditor(activeCell.row, activeCell.col)}
           onClearSelection={clearSelection}
-          onWidenActiveColumn={() => { colWidthsRef.current.set(activeCell.col, colMetrics.size(activeCell.col) + 20); setDimensionVersion((v) => v + 1); }}
-          onTallerActiveRow={() => { rowHeightsRef.current.set(activeCell.row, rowMetrics.size(activeCell.row) + 6); setDimensionVersion((v) => v + 1); }}
+          onWidenActiveColumn={() => resizeColumn(activeCell.col, colMetrics.size(activeCell.col) + 20)}
+          onTallerActiveRow={() => resizeRow(activeCell.row, rowMetrics.size(activeCell.row) + 6)}
           themeName={themeName}
           onThemeNameChange={setThemeName}
           darkMode={darkMode}
