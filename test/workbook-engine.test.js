@@ -854,6 +854,17 @@ test('dynamic array formulas can feed scalar formulas through the headless engin
       {row: 15, col: 2, formula: '=SORT(A1:B5,2,0)'},
       {row: 16, col: 2, formula: '=SORT(A1:B5,3,1)'},
       {row: 17, col: 2, formula: '=SEQUENCE(0,1)'},
+      {row: 19, col: 2, formula: '=HSTACK(A1:A2,B1:B2)'},
+      {row: 22, col: 2, formula: '=VSTACK(A1:B1,A2:B2)'},
+      {row: 25, col: 2, formula: '=TAKE(A1:B5,-2,1)'},
+      {row: 28, col: 2, formula: '=DROP(A1:B5,1,1)'},
+      {row: 33, col: 2, formula: '=CHOOSECOLS(A1:B5,2,1)'},
+      {row: 39, col: 2, formula: '=CHOOSEROWS(A1:B5,2,-1)'},
+      {row: 42, col: 2, formula: '=CHOOSECOLS(A1:B5,0)'},
+      {row: 43, col: 2, formula: '=DROP(A1:B5,5)'},
+      {row: 44, col: 2, formula: '=SUM(HSTACK(B1:B2,B3:B4))'},
+      {row: 46, col: 2, formula: '=HSTACK(A1:A3,B1:B2)'},
+      {row: 50, col: 2, formula: '=VSTACK(A1:B1,A2:A2)'},
     ],
   });
   let workbook = result.workbook;
@@ -882,6 +893,31 @@ test('dynamic array formulas can feed scalar formulas through the headless engin
   assert.equal(getCachedCellDisplayValue(sheet, 15, 2), '#VALUE!');
   assert.equal(getCachedCellDisplayValue(sheet, 16, 2), '#VALUE!');
   assert.equal(getCachedCellDisplayValue(sheet, 17, 2), '#VALUE!');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 19, 2), 'A');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 19, 3), '10');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 20, 2), 'B');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 20, 3), '30');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 22, 2), 'A');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 22, 3), '10');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 23, 2), 'B');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 23, 3), '30');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 25, 2), 'C');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 26, 2), 'A');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 28, 2), '30');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 31, 2), '40');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 33, 2), '10');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 33, 3), 'A');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 37, 2), '40');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 37, 3), 'A');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 39, 2), 'B');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 39, 3), '30');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 40, 2), 'A');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 40, 3), '40');
+  assert.equal(getCachedCellDisplayValue(sheet, 42, 2), '#VALUE!');
+  assert.equal(getCachedCellDisplayValue(sheet, 43, 2), '#CALC!');
+  assert.equal(getCachedCellDisplayValue(sheet, 44, 2), '110');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 48, 3), '#N/A');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 51, 3), '#N/A');
 
   const graph = buildWorkbookDependencyGraph(workbook);
   assert.deepEqual([...graph.dependentsByCell.get(workbookCellKey('sheet-1', 8, 2))], [
@@ -2076,6 +2112,12 @@ test('formula catalog exposes picker functions and reusable formula templates', 
   assert.equal(pickerNames.includes('INDIRECT'), true);
   assert.equal(pickerNames.includes('OFFSET'), true);
   assert.equal(pickerNames.includes('COLUMNS'), true);
+  assert.equal(pickerNames.includes('HSTACK'), true);
+  assert.equal(pickerNames.includes('VSTACK'), true);
+  assert.equal(pickerNames.includes('TAKE'), true);
+  assert.equal(pickerNames.includes('DROP'), true);
+  assert.equal(pickerNames.includes('CHOOSECOLS'), true);
+  assert.equal(pickerNames.includes('CHOOSEROWS'), true);
   assert.equal(pickerNames.includes('NETWORKDAYS'), true);
   assert.equal(pickerNames.includes('WORKDAY'), true);
   assert.equal(createFormulaTemplate('XLOOKUP', {
@@ -2158,6 +2200,18 @@ test('formula catalog exposes picker functions and reusable formula templates', 
   assert.equal(createFormulaTemplate('INDIRECT', {firstCell: 'B2'}), '=INDIRECT("B2")');
   assert.equal(createFormulaTemplate('OFFSET', {firstCell: 'B2'}), '=OFFSET(B2,1,0)');
   assert.equal(createFormulaTemplate('COLUMNS', {range: 'A1:D4'}), '=COLUMNS(A1:D4)');
+  assert.equal(createFormulaTemplate('HSTACK', {
+    firstColumnRange: 'A1:A4',
+    lastColumnRange: 'D1:D4',
+  }), '=HSTACK(A1:A4,D1:D4)');
+  assert.equal(createFormulaTemplate('VSTACK', {
+    firstColumnRange: 'A1:A4',
+    lastColumnRange: 'D1:D4',
+  }), '=VSTACK(A1:A4,D1:D4)');
+  assert.equal(createFormulaTemplate('TAKE', {range: 'A1:D4', rowCount: 4}), '=TAKE(A1:D4,2)');
+  assert.equal(createFormulaTemplate('DROP', {range: 'A1:D4'}), '=DROP(A1:D4,1)');
+  assert.equal(createFormulaTemplate('CHOOSECOLS', {range: 'A1:D4', lastColumnIndex: 4}), '=CHOOSECOLS(A1:D4,1,4)');
+  assert.equal(createFormulaTemplate('CHOOSEROWS', {range: 'A1:D4', rowCount: 4}), '=CHOOSEROWS(A1:D4,1,4)');
   assert.equal(createFormulaTemplate('NETWORKDAYS', {firstCell: 'A2', lastCell: 'D10'}), '=NETWORKDAYS(A2,D10)');
   assert.equal(createFormulaTemplate('NETWORKDAYS.INTL', {firstCell: 'A2', lastCell: 'D10'}), '=NETWORKDAYS.INTL(A2,D10,1)');
   assert.equal(createFormulaTemplate('WORKDAY', {firstCell: 'B2'}), '=WORKDAY(B2,5)');
@@ -2480,6 +2534,14 @@ test('formula catalog exposes picker functions and reusable formula templates', 
     true,
   );
   assert.equal(
+    diagnoseFormulaDraft('=CHOOSECOLS(A1:B3,3)').some((diagnostic) => diagnostic.code === 'FUNCTION_REFERENCE_INDEX'),
+    true,
+  );
+  assert.equal(
+    diagnoseFormulaDraft('=CHOOSEROWS(A1:B3,-4)').some((diagnostic) => diagnostic.code === 'FUNCTION_REFERENCE_INDEX'),
+    true,
+  );
+  assert.equal(
     diagnoseFormulaDraft('=WEEKDAY(DATE(2026,6,27),99)').some((diagnostic) => diagnostic.code === 'FUNCTION_OPTION_VALUE'),
     true,
   );
@@ -2501,6 +2563,10 @@ test('formula catalog exposes picker functions and reusable formula templates', 
   );
   assert.equal(
     diagnoseFormulaDraft('=SEQUENCE(0,1)').some((diagnostic) => diagnostic.code === 'FUNCTION_ARGUMENT_DOMAIN'),
+    true,
+  );
+  assert.equal(
+    diagnoseFormulaDraft('=TAKE(A1:B3,0)').some((diagnostic) => diagnostic.code === 'FUNCTION_ARGUMENT_DOMAIN'),
     true,
   );
   assert.equal(

@@ -69,6 +69,12 @@ export const FORMULA_CATALOG = Object.freeze([
   {name: 'SORT', category: 'Dynamic Array', picker: true},
   {name: 'SEQUENCE', category: 'Dynamic Array', picker: true},
   {name: 'TRANSPOSE', category: 'Dynamic Array', picker: true},
+  {name: 'HSTACK', category: 'Dynamic Array', picker: true},
+  {name: 'VSTACK', category: 'Dynamic Array', picker: true},
+  {name: 'TAKE', category: 'Dynamic Array', picker: true},
+  {name: 'DROP', category: 'Dynamic Array', picker: true},
+  {name: 'CHOOSECOLS', category: 'Dynamic Array', picker: true},
+  {name: 'CHOOSEROWS', category: 'Dynamic Array', picker: true},
   {name: 'ROW', category: 'Reference', picker: true},
   {name: 'COLUMN', category: 'Reference', picker: true},
   {name: 'ROWS', category: 'Reference', picker: true},
@@ -272,6 +278,12 @@ const FORMULA_HELP = Object.freeze({
   SORT: {signature: 'SORT(array, [sort_index], [sort_order], [by_col])', description: 'Sorts rows or columns in an array by a selected index.'},
   SEQUENCE: {signature: 'SEQUENCE(rows, [columns], [start], [step])', description: 'Generates a rectangular numeric sequence.'},
   TRANSPOSE: {signature: 'TRANSPOSE(array)', description: 'Flips rows and columns in an array.'},
+  HSTACK: {signature: 'HSTACK(array1, [array2], ...)', description: 'Appends arrays horizontally into one wider dynamic array.'},
+  VSTACK: {signature: 'VSTACK(array1, [array2], ...)', description: 'Appends arrays vertically into one taller dynamic array.'},
+  TAKE: {signature: 'TAKE(array, rows, [columns])', description: 'Returns rows or columns from the start or end of an array.'},
+  DROP: {signature: 'DROP(array, rows, [columns])', description: 'Excludes rows or columns from the start or end of an array.'},
+  CHOOSECOLS: {signature: 'CHOOSECOLS(array, col_num1, [col_num2], ...)', description: 'Returns selected columns from an array in the requested order.'},
+  CHOOSEROWS: {signature: 'CHOOSEROWS(array, row_num1, [row_num2], ...)', description: 'Returns selected rows from an array in the requested order.'},
   ROW: {signature: 'ROW([reference])', description: 'Returns the row number for a reference or the current cell.'},
   COLUMN: {signature: 'COLUMN([reference])', description: 'Returns the column number for a reference or the current cell.'},
   ROWS: {signature: 'ROWS(range)', description: 'Returns the number of rows in a reference.'},
@@ -351,6 +363,7 @@ const FORMULA_ARGUMENT_HELP = Object.freeze({
   basis: {description: 'The day-count basis used for year fraction calculations.'},
   bottom: {description: 'The lowest integer that RANDBETWEEN can return.'},
   calculation_or_name: {description: 'Either the final calculation to return, or the next local name in a LET name/value pair.'},
+  col_num: {description: 'A one-based column position to return. Negative values count back from the end.'},
   column: {description: 'The one-based column number or reference column to use.'},
   columns: {description: 'The number of columns to return. This value must be at least 1 when supplied.'},
   condition: {description: 'A logical test that resolves to TRUE or FALSE.'},
@@ -408,6 +421,7 @@ const FORMULA_ARGUMENT_HELP = Object.freeze({
   reference: {description: 'A cell or range reference.'},
   result_range: {description: 'The row, column, or range that returns values for the matching lookup position.'},
   row: {description: 'The one-based row number or reference row to use.'},
+  row_num: {description: 'A one-based row position to return. Negative values count back from the end.'},
   rows: {description: 'The number of rows to return. This value must be at least 1 when supplied.'},
   search_key: {description: 'The value to find in the lookup range.'},
   search_mode: {description: 'Controls forward, reverse, or binary search order.'},
@@ -442,6 +456,16 @@ const FORMULA_FUNCTION_ARGUMENT_HELP = Object.freeze({
   FILTER: {
     include: {description: 'A Boolean row or column vector with the same height or width as the filtered array.'},
   },
+  CHOOSECOLS: {
+    col_num: {description: 'Select one or more one-based columns. Negative values select columns from the right edge.'},
+  },
+  CHOOSEROWS: {
+    row_num: {description: 'Select one or more one-based rows. Negative values select rows from the bottom edge.'},
+  },
+  DROP: {
+    rows: {description: 'Positive values remove rows from the top; negative values remove rows from the bottom; zero leaves rows unchanged.'},
+    columns: {description: 'Positive values remove columns from the left; negative values remove columns from the right; zero leaves columns unchanged.'},
+  },
   INDEX: {
     row: {description: 'The one-based row inside the reference. Use 0 to return an entire column when supported.'},
     column: {description: 'The one-based column inside the reference. Use 0 to return an entire row when supported.'},
@@ -465,6 +489,10 @@ const FORMULA_FUNCTION_ARGUMENT_HELP = Object.freeze({
     sort_index: {description: 'The one-based row or column inside the array to sort by.'},
     sort_order: {description: 'Use 1 for ascending order or -1 for descending order.', options: ['1 ascending', '-1 descending']},
     by_col: {description: 'FALSE sorts rows by a column; TRUE sorts columns by a row.'},
+  },
+  TAKE: {
+    rows: {description: 'Positive values return rows from the top; negative values return rows from the bottom.'},
+    columns: {description: 'Positive values return columns from the left; negative values return columns from the right.'},
   },
   TEXTAFTER: {
     match_mode: {description: 'Use 0 for case-sensitive delimiter matching or 1 for case-insensitive matching.', options: ['0 case-sensitive', '1 case-insensitive']},
@@ -1051,6 +1079,20 @@ function formulaReferenceIndexDiagnostics(formula, context = {}) {
       end: call.end,
     });
   };
+  const addSignedIndexDiagnostic = (call, argumentName, rawValue, max) => {
+    diagnostics.push({
+      severity: 'warning',
+      code: 'FUNCTION_REFERENCE_INDEX',
+      message: `${call.name} ${argumentName} must be between 1 and ${max}, or -${max} and -1; found ${rawValue}.`,
+      functionName: call.name,
+      argumentName,
+      value: rawValue,
+      min: -max,
+      max,
+      start: call.start,
+      end: call.end,
+    });
+  };
 
   for (const call of formulaClosedFunctionCalls(formula)) {
     if (call.name === 'INDEX') {
@@ -1094,6 +1136,21 @@ function formulaReferenceIndexDiagnostics(formula, context = {}) {
       const maxIndex = byCol ? shape.rows : shape.cols;
       const sortIndex = Math.trunc(sortIndexValue);
       if (sortIndex > maxIndex) addIndexDiagnostic(call, 'sort_index', call.args[1] ?? '1', maxIndex, 'FUNCTION_OPTION_VALUE');
+      continue;
+    }
+    if (call.name === 'CHOOSECOLS' || call.name === 'CHOOSEROWS') {
+      const shape = formulaRangeShape(formulaRangeReferenceForDiagnostics(call.args[0], context));
+      if (!shape) continue;
+      const maxIndex = call.name === 'CHOOSECOLS' ? shape.cols : shape.rows;
+      const argumentName = call.name === 'CHOOSECOLS' ? 'col_num' : 'row_num';
+      for (let index = 1; index < call.args.length; index++) {
+        const rawValue = formulaStaticNumberArgument(call.args[index]);
+        if (rawValue == null) continue;
+        const selectedIndex = Math.trunc(rawValue);
+        if (selectedIndex === 0 || Math.abs(selectedIndex) > maxIndex) {
+          addSignedIndexDiagnostic(call, argumentName, call.args[index], maxIndex);
+        }
+      }
     }
   }
   return diagnostics;
@@ -1130,6 +1187,13 @@ function formulaArgumentDomainDiagnostics(formula, context = {}) {
     if (call.name === 'SEQUENCE') {
       addMinimumDiagnostic(call, 0, 'rows', 1);
       addMinimumDiagnostic(call, 1, 'columns', 1);
+      continue;
+    }
+    if (call.name === 'TAKE') {
+      const rows = formulaStaticNumberArgument(call.args[1]);
+      const columns = formulaStaticNumberArgument(call.args[2]);
+      if (rows != null && Math.trunc(rows) === 0) addDomainDiagnostic(call, 'rows', call.args[1], 'cannot be zero');
+      if (columns != null && Math.trunc(columns) === 0) addDomainDiagnostic(call, 'columns', call.args[2], 'cannot be zero');
       continue;
     }
     if (call.name === 'LARGE' || call.name === 'SMALL') {
@@ -2243,6 +2307,12 @@ export function createFormulaTemplate(name, context = {}) {
     SORT: `=SORT(${range},1,1)`,
     SEQUENCE: `=SEQUENCE(${Math.max(1, rowCount)},${Math.max(1, lastColumnIndex)})`,
     TRANSPOSE: `=TRANSPOSE(${range})`,
+    HSTACK: `=HSTACK(${firstColumnRange},${lastColumnRange})`,
+    VSTACK: `=VSTACK(${firstColumnRange},${lastColumnRange})`,
+    TAKE: `=TAKE(${range},${Math.min(2, Math.max(1, rowCount))})`,
+    DROP: `=DROP(${range},1)`,
+    CHOOSECOLS: `=CHOOSECOLS(${range},1,${Math.max(1, lastColumnIndex)})`,
+    CHOOSEROWS: `=CHOOSEROWS(${range},1,${Math.max(1, rowCount)})`,
     ROW: `=ROW(${firstCell})`,
     COLUMN: `=COLUMN(${firstCell})`,
     ROWS: `=ROWS(${range})`,
@@ -4309,6 +4379,26 @@ export function evaluateFormula(raw, dataRef, origin, getDefaultCellValue = defa
       rows: matrix.length,
       cols: Math.max(0, ...matrix.map((row) => row.length)),
     });
+    const nonEmptyMatrixForArg = (arg) => {
+      const matrix = matrixForAnyArg(arg);
+      if (isErrorValue(matrix)) return matrix;
+      const size = matrixDimensions(matrix);
+      return size.rows > 0 && size.cols > 0 ? matrix : '#VALUE!';
+    };
+    const paddedMatrixRow = (row, colCount, fillValue = '#N/A') => (
+      Array.from({length: colCount}, (_item, colIndex) => row?.[colIndex] ?? fillValue)
+    );
+    const sliceMatrix = (matrix, rowStart, rowEnd, colStart, colEnd) => (
+      matrix.slice(rowStart, rowEnd).map((row) => (
+        Array.from({length: colEnd - colStart}, (_item, index) => row[colStart + index] ?? '')
+      ))
+    );
+    const signedIndexOffset = (rawIndex, maxIndex) => {
+      const index = Math.trunc(rawIndex);
+      if (!Number.isFinite(index) || index === 0) return null;
+      const offset = index > 0 ? index - 1 : maxIndex + index;
+      return offset >= 0 && offset < maxIndex ? offset : null;
+    };
     const booleanMatrixForArg = (arg) => {
       const comparison = findComparison(arg);
       if (!comparison) {
@@ -4673,6 +4763,76 @@ export function evaluateFormula(raw, dataRef, origin, getDefaultCellValue = defa
       return formulaArrayValue(Array.from({length: colCount}, (_row, colIndex) => (
         matrix.map((row) => row[colIndex] ?? '')
       )));
+    }
+    if (name === 'HSTACK' || name === 'VSTACK') {
+      if (!args.length) return '#VALUE!';
+      const matrices = args.map((arg) => nonEmptyMatrixForArg(arg));
+      const error = firstErrorValue(matrices);
+      if (error) return error;
+      const sizes = matrices.map(matrixDimensions);
+      if (name === 'HSTACK') {
+        const rowCount = Math.max(0, ...sizes.map((size) => size.rows));
+        return formulaArrayValue(Array.from({length: rowCount}, (_row, rowIndex) => (
+          matrices.flatMap((matrix, matrixIndex) => paddedMatrixRow(matrix[rowIndex], sizes[matrixIndex].cols))
+        )));
+      }
+      const colCount = Math.max(0, ...sizes.map((size) => size.cols));
+      return formulaArrayValue(matrices.flatMap((matrix) => (
+        matrix.map((row) => paddedMatrixRow(row, colCount))
+      )));
+    }
+    if (name === 'TAKE') {
+      if (args.length < 2) return '#VALUE!';
+      const matrix = nonEmptyMatrixForArg(args[0]);
+      if (isErrorValue(matrix)) return matrix;
+      const size = matrixDimensions(matrix);
+      const rawRows = resolveNumber(args[1]);
+      const rawCols = args[2] == null ? size.cols : resolveNumber(args[2]);
+      const error = firstErrorValue([rawRows, rawCols]);
+      if (error) return error;
+      const rowCount = Math.trunc(rawRows);
+      const colCount = Math.trunc(rawCols);
+      if (!Number.isFinite(rowCount) || !Number.isFinite(colCount) || rowCount === 0 || colCount === 0) return '#CALC!';
+      const rowsToTake = Math.min(Math.abs(rowCount), size.rows);
+      const colsToTake = Math.min(Math.abs(colCount), size.cols);
+      const rowStart = rowCount > 0 ? 0 : size.rows - rowsToTake;
+      const colStart = colCount > 0 ? 0 : size.cols - colsToTake;
+      return formulaArrayValue(sliceMatrix(matrix, rowStart, rowStart + rowsToTake, colStart, colStart + colsToTake));
+    }
+    if (name === 'DROP') {
+      if (args.length < 2) return '#VALUE!';
+      const matrix = nonEmptyMatrixForArg(args[0]);
+      if (isErrorValue(matrix)) return matrix;
+      const size = matrixDimensions(matrix);
+      const rawRows = resolveNumber(args[1]);
+      const rawCols = args[2] == null ? 0 : resolveNumber(args[2]);
+      const error = firstErrorValue([rawRows, rawCols]);
+      if (error) return error;
+      const rowsToDrop = Math.trunc(rawRows);
+      const colsToDrop = Math.trunc(rawCols);
+      if (!Number.isFinite(rowsToDrop) || !Number.isFinite(colsToDrop)) return '#VALUE!';
+      const rowStart = rowsToDrop > 0 ? Math.min(rowsToDrop, size.rows) : 0;
+      const rowEnd = rowsToDrop < 0 ? Math.max(0, size.rows + rowsToDrop) : size.rows;
+      const colStart = colsToDrop > 0 ? Math.min(colsToDrop, size.cols) : 0;
+      const colEnd = colsToDrop < 0 ? Math.max(0, size.cols + colsToDrop) : size.cols;
+      if (rowStart >= rowEnd || colStart >= colEnd) return '#CALC!';
+      return formulaArrayValue(sliceMatrix(matrix, rowStart, rowEnd, colStart, colEnd));
+    }
+    if (name === 'CHOOSECOLS' || name === 'CHOOSEROWS') {
+      if (args.length < 2) return '#VALUE!';
+      const matrix = nonEmptyMatrixForArg(args[0]);
+      if (isErrorValue(matrix)) return matrix;
+      const size = matrixDimensions(matrix);
+      const selectedOffsets = args.slice(1).map((arg) => {
+        const value = resolveNumber(arg);
+        return isErrorValue(value) ? value : signedIndexOffset(value, name === 'CHOOSECOLS' ? size.cols : size.rows);
+      });
+      const error = firstErrorValue(selectedOffsets);
+      if (error) return error;
+      if (selectedOffsets.some((offset) => offset == null)) return '#VALUE!';
+      return formulaArrayValue(name === 'CHOOSECOLS'
+        ? matrix.map((row) => selectedOffsets.map((colIndex) => row[colIndex] ?? ''))
+        : selectedOffsets.map((rowIndex) => paddedMatrixRow(matrix[rowIndex], size.cols, '')));
     }
     if (name === 'FILTER') {
       const matrix = matrixForRangeArg(args[0]);
