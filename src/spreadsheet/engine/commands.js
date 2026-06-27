@@ -2,6 +2,7 @@ import {cellKey} from '../model/address.js';
 import {normalizeSelection} from '../model/selection.js';
 import {cloneCellRecord, normalizeCellRecord} from './cells.js';
 import {mergeCellFormat} from './formatting.js';
+import {cloneNamedRange, createNamedRange, normalizeName} from './names.js';
 import {cloneSheet, cloneWorkbook, createSheet, getSheet, setCellRecord, withClonedSheet} from './workbook.js';
 
 export const CommandType = {
@@ -16,6 +17,8 @@ export const CommandType = {
   ADD_SHEET: 'ADD_SHEET',
   REMOVE_SHEET: 'REMOVE_SHEET',
   RENAME_SHEET: 'RENAME_SHEET',
+  SET_NAMED_RANGE: 'SET_NAMED_RANGE',
+  REMOVE_NAMED_RANGE: 'REMOVE_NAMED_RANGE',
 };
 
 function normalizeCommandCell(command) {
@@ -256,6 +259,32 @@ function applyRenameSheet(workbook, command) {
   };
 }
 
+function applySetNamedRange(workbook, command) {
+  const namedRange = createNamedRange(command.namedRange || command);
+  const oldRange = cloneNamedRange(workbook.namedRanges.get(namedRange.name));
+  const nextWorkbook = cloneWorkbook(workbook);
+  nextWorkbook.namedRanges.set(namedRange.name, namedRange);
+  nextWorkbook.version = workbook.version + 1;
+  return {
+    workbook: nextWorkbook,
+    inverse: oldRange
+      ? {type: CommandType.SET_NAMED_RANGE, namedRange: oldRange}
+      : {type: CommandType.REMOVE_NAMED_RANGE, name: namedRange.name},
+  };
+}
+
+function applyRemoveNamedRange(workbook, command) {
+  const name = normalizeName(command.name);
+  const oldRange = cloneNamedRange(workbook.namedRanges.get(name));
+  const nextWorkbook = cloneWorkbook(workbook);
+  nextWorkbook.namedRanges.delete(name);
+  nextWorkbook.version = workbook.version + 1;
+  return {
+    workbook: nextWorkbook,
+    inverse: oldRange ? {type: CommandType.SET_NAMED_RANGE, namedRange: oldRange} : {type: CommandType.REMOVE_NAMED_RANGE, name},
+  };
+}
+
 function applyBatch(workbook, command) {
   const inverses = [];
   let nextWorkbook = workbook;
@@ -283,6 +312,8 @@ export function applyWorkbookCommand(workbook, command) {
   if (command.type === CommandType.ADD_SHEET) return applyAddSheet(workbook, command);
   if (command.type === CommandType.REMOVE_SHEET) return applyRemoveSheet(workbook, command);
   if (command.type === CommandType.RENAME_SHEET) return applyRenameSheet(workbook, command);
+  if (command.type === CommandType.SET_NAMED_RANGE) return applySetNamedRange(workbook, command);
+  if (command.type === CommandType.REMOVE_NAMED_RANGE) return applyRemoveNamedRange(workbook, command);
   throw new Error(`Unknown workbook command: ${command.type}`);
 }
 

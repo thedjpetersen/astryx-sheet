@@ -4,6 +4,7 @@ import {defaultCellValue} from '../model/defaultData.js';
 import {displayCellValue} from '../model/formulas.js';
 import {cellRecordToRaw, cellRecordToSerializable, cloneCellRecord, normalizeCellRecord} from './cells.js';
 import {formatValue} from './formatting.js';
+import {cloneNamedRange, createNamedRangeStore} from './names.js';
 
 let nextWorkbookId = 1;
 let nextSheetId = 1;
@@ -72,6 +73,7 @@ export function createWorkbook(input = {}) {
     activeSheetId,
     sheetOrder,
     sheets: new Map(sheets.map((sheet) => [sheet.id, sheet])),
+    namedRanges: createNamedRangeStore(input.namedRanges),
     history: input.history ? [...input.history] : [],
     future: input.future ? [...input.future] : [],
     version: input.version || 0,
@@ -84,6 +86,7 @@ export function cloneWorkbook(workbook) {
     ...workbook,
     sheetOrder: [...workbook.sheetOrder],
     sheets: new Map(workbook.sheets),
+    namedRanges: new Map(Array.from(workbook.namedRanges.entries(), ([name, range]) => [name, cloneNamedRange(range)])),
     history: [...workbook.history],
     future: [...workbook.future],
     metadata: {...workbook.metadata},

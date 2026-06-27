@@ -16,6 +16,8 @@ import {
   getCachedCellDisplayValue,
   getCellDisplayValue,
   getCellRawValue,
+  getNamedRange,
+  listNamedRanges,
   NumberFormatType,
   parseDelimited,
   recalculateWorkbook,
@@ -248,6 +250,27 @@ test('sort range command orders rows and restores with undo', () => {
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 0), 'Ada');
   assert.equal(getCellRawValue(workbook, 'sheet-1', 2, 0), 'Grace');
   assert.equal(getCellRawValue(workbook, 'sheet-1', 3, 0), 'Linus');
+});
+
+test('named ranges are undoable and survive snapshots', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_NAMED_RANGE,
+    name: 'Revenue',
+    sheetId: 'sheet-1',
+    range: {r1: 1, c1: 1, r2: 10, c2: 4},
+    comment: 'Quarterly revenue',
+  });
+
+  assert.equal(getNamedRange(workbook, 'Revenue').comment, 'Quarterly revenue');
+  assert.equal(listNamedRanges(workbook).length, 1);
+
+  workbook = undo(workbook);
+  assert.equal(getNamedRange(workbook, 'Revenue'), null);
+  workbook = redo(workbook);
+
+  const restored = deserializeWorkbook(serializeWorkbook(workbook));
+  assert.deepEqual(getNamedRange(restored, 'Revenue').range, {r1: 1, c1: 1, r2: 10, c2: 4});
 });
 
 test('explicit blank cells can override generated defaults', () => {

@@ -5,6 +5,7 @@ export {DelimitedFormat, createImportDelimitedCommand, delimiterForFormat, parse
 export {dispatchCommandWithRecalculation, evaluateCellForCache, getCachedCellDisplayValue, recalculateSheet, recalculateWorkbook} from './calculation.js';
 export {buildDependencyGraph, collectDependentCells, extractFormulaReferences, getFormulaRecalculationOrder} from './dependencies.js';
 export {NumberFormatType, formatValue, mergeCellFormat} from './formatting.js';
+export {cloneNamedRange, createNamedRange, createNamedRangeStore, getNamedRange, listNamedRanges, normalizeName} from './names.js';
 export {deserializeWorkbook, serializeWorkbook} from './serialization.js';
 export {
   createCellStore,
