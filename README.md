@@ -25,6 +25,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Grouped workbook commands and range-copy helpers for compound undo, metadata-preserving copies, and relative formula translation
 - Formula dependency graph utilities for dirty-cell discovery and recalculation ordering
 - Cached recalculation helpers for full-sheet and dirty-formula updates
+- Command dispatch wrapper that derives changed cells and refreshes dependent formula caches
 - Formula evaluation for `SUM`, `AVERAGE` / `AVG`, `MIN`, `MAX`, `COUNT`, `CONCAT`, cell references, ranges, and basic arithmetic
 - Right-click context menu for edit, clear, copy, resize, and sample formula actions
 - Live inspector panel showing mounted cells, sparse overrides, effect-registered geometry, and approximate FPS

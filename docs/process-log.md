@@ -15,6 +15,7 @@
 - Added workbook-range copy commands that preserve cell metadata and translate relative formula references.
 - Added formula dependency graph utilities for dirty-dependent discovery and recalculation ordering.
 - Added cached recalculation helpers for full-sheet and dirty formula updates.
+- Added a dispatch-with-recalculation engine API that derives changed cells from commands and refreshes dependent formula caches.
 
 ## Current Direction
 
@@ -23,4 +24,4 @@ The package should grow around two public layers:
 - A workbook engine that can run without React and eventually own Excel-scale state, formulas, commands, history, import/export, and collaboration hooks.
 - A virtualized React grid that consumes the engine and can be embedded with or without the Astryx toolbar and themes.
 
-The next implementation pass should add an automatic recalculation scheduler around workbook commands, then expand paste semantics for formatting-oriented external clipboard payloads and larger ranges.
+The next implementation pass should connect the React spreadsheet to cached recalculation results where appropriate, then expand paste semantics for formatting-oriented external clipboard payloads and larger ranges.

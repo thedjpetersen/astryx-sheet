@@ -8,7 +8,9 @@ import {
   createWorkbook,
   deserializeWorkbook,
   dispatchCommand,
+  dispatchCommandWithRecalculation,
   extractFormulaReferences,
+  getChangedCellKeysForCommand,
   getFormulaRecalculationOrder,
   getCachedCellDisplayValue,
   getCellDisplayValue,
@@ -148,6 +150,32 @@ test('recalculation caches full and dirty formula results', () => {
   assert.deepEqual(result.recalculated, ['0:1', '0:2']);
   assert.equal(getCachedCellDisplayValue(workbook.sheets.get('sheet-1'), 0, 1), '11');
   assert.equal(getCachedCellDisplayValue(workbook.sheets.get('sheet-1'), 0, 2), '12');
+});
+
+test('dispatch with recalculation updates dependent formula caches from command changes', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  let result = dispatchCommandWithRecalculation(workbook, {
+    type: CommandType.SET_RANGE,
+    cells: [
+      {row: 0, col: 0, value: '2'},
+      {row: 0, col: 1, formula: '=A1+1'},
+      {row: 0, col: 2, formula: '=B1+1'},
+    ],
+  });
+  workbook = result.workbook;
+
+  assert.deepEqual(result.recalculated, ['0:1', '0:2']);
+  assert.equal(getCachedCellDisplayValue(workbook.sheets.get('sheet-1'), 0, 2), '4');
+
+  assert.deepEqual([...getChangedCellKeysForCommand({type: CommandType.SET_CELL, row: 0, col: 0, value: '9'})], ['0:0']);
+
+  result = dispatchCommandWithRecalculation(workbook, {type: CommandType.SET_CELL, row: 0, col: 0, value: '9'});
+  workbook = result.workbook;
+
+  assert.deepEqual([...result.changedKeys], ['0:0']);
+  assert.deepEqual(result.recalculated, ['0:1', '0:2']);
+  assert.equal(getCachedCellDisplayValue(workbook.sheets.get('sheet-1'), 0, 2), '11');
+  assert.equal(workbook.history.length, 2);
 });
 
 test('explicit blank cells can override generated defaults', () => {

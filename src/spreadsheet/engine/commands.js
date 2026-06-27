@@ -32,6 +32,37 @@ function* iterateRange(range) {
   }
 }
 
+export function getChangedCellKeysForCommand(command) {
+  const keys = new Set();
+  if (!command?.type) return keys;
+  if (command.type === CommandType.BATCH) {
+    for (const childCommand of command.commands || []) {
+      for (const key of getChangedCellKeysForCommand(childCommand)) keys.add(key);
+    }
+    return keys;
+  }
+  if (command.type === CommandType.SET_CELL) {
+    keys.add(cellKey(command.row, command.col));
+    return keys;
+  }
+  if (command.type === CommandType.SET_RANGE) {
+    for (const item of command.cells || []) keys.add(cellKey(item.row, item.col));
+    return keys;
+  }
+  if (command.type === CommandType.CLEAR_RANGE) {
+    for (const point of iterateRange(command.range)) keys.add(cellKey(point.row, point.col));
+  }
+  return keys;
+}
+
+export function getCommandSheetId(workbook, command) {
+  if (command?.sheetId) return command.sheetId;
+  if (command?.type === CommandType.BATCH) {
+    return (command.commands || []).find((childCommand) => childCommand.sheetId)?.sheetId || workbook.activeSheetId;
+  }
+  return workbook.activeSheetId;
+}
+
 function applySetCell(workbook, command) {
   const sheetId = command.sheetId || workbook.activeSheetId;
   const oldCell = cloneCellRecord(getSheet(workbook, sheetId).cells.get(cellKey(command.row, command.col)));
