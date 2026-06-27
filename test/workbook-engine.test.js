@@ -6,6 +6,8 @@ import {
   createCopyRangeCommand,
   createImportDelimitedCommand,
   createImportHtmlTableCommand,
+  createCommandJournal,
+  bindWorkbookCommandJournal,
   createMemoryWorkbookStorage,
   createPasteTsvCommand,
   createWorkbook,
@@ -33,6 +35,7 @@ import {
   rangeToDelimited,
   rangeToHtmlTable,
   rangeToTsv,
+  replayCommandJournal,
   redo,
   serializeWorkbook,
   undo,
@@ -147,6 +150,37 @@ test('workbook persistence saves controller snapshots to storage and loads them'
   await restoredPersistence.flush();
 
   assert.equal(getCellRawValue(deserializeWorkbook(JSON.parse(storage.getItem('embedded-book'))), 'sheet-1', 4, 2), 'Persisted');
+});
+
+test('command journals capture controller commands and replay them', () => {
+  const controller = createWorkbookController({sheets: [{id: 'sheet-1'}]});
+  const journal = createCommandJournal();
+  const binding = bindWorkbookCommandJournal(controller, {journal, source: 'client-a'});
+  const observed = [];
+  const unsubscribe = journal.subscribe((entry) => observed.push(entry));
+
+  controller.dispatch({type: CommandType.SET_CELL, row: 0, col: 0, value: 'A'});
+  controller.dispatch({type: CommandType.SET_CELL, row: 0, col: 1, value: 'B'});
+
+  assert.equal(journal.entries().length, 2);
+  assert.equal(observed.length, 2);
+  assert.equal(journal.entries()[0].source, 'client-a');
+  assert.equal(journal.entries()[0].command.type, CommandType.SET_CELL);
+
+  binding.pause();
+  controller.dispatch({type: CommandType.SET_CELL, row: 0, col: 2, value: 'Not replayed'});
+  assert.equal(journal.entries().length, 2);
+  binding.resume();
+
+  const replayController = createWorkbookController({sheets: [{id: 'sheet-1'}]});
+  replayCommandJournal(replayController, journal);
+
+  assert.equal(getCellRawValue(replayController.getWorkbook(), 'sheet-1', 0, 0), 'A');
+  assert.equal(getCellRawValue(replayController.getWorkbook(), 'sheet-1', 0, 1), 'B');
+  assert.equal(getCellRawValue(replayController.getWorkbook(), 'sheet-1', 0, 2), '');
+
+  unsubscribe();
+  binding.destroy();
 });
 
 test('batch commands undo and redo as one history entry', () => {

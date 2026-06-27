@@ -55,6 +55,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - `onWorkbookChange` callback for host applications that need workbook state after cell, sheet, history, format, filter, sort, clipboard, or resize commands
 - Headless `createWorkbookController` API for non-React command dispatch, subscriptions, history, recalculation, and snapshots
 - Headless `createWorkbookPersistence` helpers for binding controller snapshots to host storage, including an in-memory adapter for tests and non-browser runtimes
+- Headless command journal helpers for recording and replaying controller commands in collaboration or audit-log workflows
 - Workbook engine primitives for sparse sheets, active-sheet state, cells, formulas, commands, undo/redo, TSV clipboard data, and JSON snapshots
 
 ## Why this exists
