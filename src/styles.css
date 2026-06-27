@@ -211,7 +211,7 @@ button, input { font: inherit; }
 }
 .spacer { position: relative; min-width: 100%; min-height: 100%; }
 .cell-layer { position: absolute; inset: 0; contain: strict; }
-.row-fragment { position: absolute; contain: layout style paint; }
+.row-fragment { position: absolute; contain: layout style; }
 .cell {
   position: absolute; overflow: hidden; display: flex; align-items: center;
   padding: 0 var(--spacing-2);
@@ -224,6 +224,8 @@ button, input { font: inherit; }
 .cell.edited-cell::after { content: ""; position: absolute; top: 2px; right: 2px; width: 0; height: 0; border-top: 7px solid var(--color-accent); border-left: 7px solid transparent; opacity: .9; }
 .cell.invalid-cell { background: color-mix(in srgb, var(--color-background-red) 36%, var(--color-background-surface)); box-shadow: inset 0 0 0 1px var(--color-border-red); }
 .cell.invalid-cell::before { content: ""; position: absolute; top: 2px; left: 2px; width: 0; height: 0; border-top: 7px solid var(--color-border-red); border-right: 7px solid transparent; opacity: .95; }
+.cell.merged-cell { z-index: 1; justify-content: center; box-shadow: inset 0 0 0 1px var(--color-border-emphasized); }
+.cell.invalid-cell.merged-cell { box-shadow: inset 0 0 0 1px var(--color-border-red); }
 .cell.active-cell { outline: 2px solid var(--color-accent); outline-offset: -2px; z-index: 2; background: color-mix(in srgb, var(--color-accent-muted) 42%, var(--color-background-surface)); }
 .cell:hover { background: var(--color-overlay-hover); }
 .status-pill { padding: 2px 7px; border-radius: var(--radius-full); border: 1px solid var(--color-border); background: var(--color-background-muted); font-size: 11px; }

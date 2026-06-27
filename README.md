@@ -40,6 +40,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Sheet filter state with criteria evaluation, visible-row selectors, undo/redo, and snapshot serialization
 - React toolbar filtering that collapses hidden rows through the virtualized row metrics
 - Merged range metadata with overlap validation, undo/redo, selectors, and snapshot serialization
+- React grid rendering for host-provided merged ranges, including row and column spans in the virtual window
 - Data validation rules with list, number, and text predicates plus undo/redo and snapshot serialization
 - React edit, clear, and paste flows enforce host-provided validation rules and mark invalid visible cells
 - Inspector metrics for merged ranges, validation rules, and named ranges

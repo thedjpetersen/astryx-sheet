@@ -75,6 +75,7 @@ export function Spreadsheet({
   initialCells,
   initialRowHeights,
   initialColWidths,
+  initialMerges,
   initialValidations,
   getDefaultCellValue = defaultCellValue,
   defaultThemeName = 'neutral',
@@ -136,6 +137,7 @@ export function Spreadsheet({
       cells: initialCells ?? createDefaultCellData(),
       rowHeights: initialRowHeights ?? createDefaultRowHeights(),
       colWidths: initialColWidths ?? createDefaultColWidths(),
+      merges: initialMerges,
       validations: initialValidations,
     }],
   }));
@@ -700,6 +702,8 @@ export function Spreadsheet({
   const rows = useMemo(() => Array.from({length: Math.max(0, view.rowEnd - view.rowStart + 1)}, (_, i) => view.rowStart + i), [view.rowStart, view.rowEnd]);
   const renderedRows = useMemo(() => filteredRows?.hiddenRows?.length ? rows.filter((row) => rowMetrics.size(row) > 0) : rows, [filteredRows, rowMetrics, rows]);
   const columns = useMemo(() => Array.from({length: Math.max(0, view.colEnd - view.colStart + 1)}, (_, i) => view.colStart + i), [view.colStart, view.colEnd]);
+  const firstRenderedRow = renderedRows[0] ?? view.rowStart;
+  const firstRenderedCol = columns[0] ?? view.colStart;
   const calculationStats = useMemo(() => {
     let formulas = 0;
     let cached = 0;
@@ -808,6 +812,9 @@ export function Spreadsheet({
                       height={rowMetrics.size(row)}
                       columns={columns}
                       colMetrics={colMetrics}
+                      rowMetrics={rowMetrics}
+                      firstRenderedRow={firstRenderedRow}
+                      firstRenderedCol={firstRenderedCol}
                       registerRow={registerRow}
                       registerCell={registerCell}
                       activeCell={activeCell}
