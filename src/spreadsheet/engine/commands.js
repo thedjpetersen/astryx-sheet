@@ -10,6 +10,7 @@ export const CommandType = {
   SET_RANGE: 'SET_RANGE',
   CLEAR_RANGE: 'CLEAR_RANGE',
   SET_RANGE_FORMAT: 'SET_RANGE_FORMAT',
+  SORT_RANGE: 'SORT_RANGE',
   RESIZE_ROW: 'RESIZE_ROW',
   RESIZE_COLUMN: 'RESIZE_COLUMN',
   ADD_SHEET: 'ADD_SHEET',
@@ -53,6 +54,12 @@ export function getChangedCellKeysForCommand(command) {
   }
   if (command.type === CommandType.CLEAR_RANGE) {
     for (const point of iterateRange(command.range)) keys.add(cellKey(point.row, point.col));
+  }
+  if (command.type === CommandType.SORT_RANGE) {
+    const startRow = command.hasHeader ? command.range.r1 + 1 : command.range.r1;
+    for (let row = startRow; row <= command.range.r2; row++) {
+      for (let col = command.range.c1; col <= command.range.c2; col++) keys.add(cellKey(row, col));
+    }
   }
   return keys;
 }
@@ -123,6 +130,72 @@ function applySetRangeFormat(workbook, command) {
       sheet.cells.set(key, nextCell);
     }
   });
+  return {
+    workbook: nextWorkbook,
+    inverse: {type: CommandType.SET_RANGE, sheetId, cells: oldCells},
+  };
+}
+
+function getSortValue(cell) {
+  if (!cell) return '';
+  if ('computedValue' in cell) return cell.computedValue;
+  if ('value' in cell) return cell.value;
+  if (cell.formula) return cell.formula;
+  return '';
+}
+
+function compareSortValues(a, b, type) {
+  const emptyA = a == null || a === '';
+  const emptyB = b == null || b === '';
+  if (emptyA && emptyB) return 0;
+  if (emptyA) return 1;
+  if (emptyB) return -1;
+  if (type === 'number') {
+    const numberA = Number(String(a).replace(/[$,%\s,]/g, ''));
+    const numberB = Number(String(b).replace(/[$,%\s,]/g, ''));
+    if (Number.isFinite(numberA) && Number.isFinite(numberB)) return numberA - numberB;
+  }
+  const dateA = type === 'date' ? new Date(a).getTime() : NaN;
+  const dateB = type === 'date' ? new Date(b).getTime() : NaN;
+  if (Number.isFinite(dateA) && Number.isFinite(dateB)) return dateA - dateB;
+  return String(a).localeCompare(String(b), undefined, {numeric: true, sensitivity: 'base'});
+}
+
+function applySortRange(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const range = command.range;
+  const startRow = command.hasHeader ? range.r1 + 1 : range.r1;
+  const sortBy = command.sortBy?.length ? command.sortBy : [{col: range.c1, direction: 'asc'}];
+  const oldCells = [];
+
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
+    const rows = [];
+    for (let row = startRow; row <= range.r2; row++) {
+      const cells = [];
+      for (let col = range.c1; col <= range.c2; col++) {
+        const key = cellKey(row, col);
+        const cell = cloneCellRecord(sheet.cells.get(key));
+        oldCells.push({row, col, cell});
+        cells.push({col, cell});
+      }
+      rows.push({sourceRow: row, cells});
+    }
+    rows.sort((rowA, rowB) => {
+      for (const sort of sortBy) {
+        const col = sort.col ?? range.c1;
+        const valueA = getSortValue(rowA.cells.find((item) => item.col === col)?.cell);
+        const valueB = getSortValue(rowB.cells.find((item) => item.col === col)?.cell);
+        const result = compareSortValues(valueA, valueB, sort.type);
+        if (result !== 0) return sort.direction === 'desc' ? -result : result;
+      }
+      return rowA.sourceRow - rowB.sourceRow;
+    });
+    rows.forEach((rowData, rowOffset) => {
+      const targetRow = startRow + rowOffset;
+      rowData.cells.forEach(({col, cell}) => setCellRecord(sheet, targetRow, col, cell));
+    });
+  });
+
   return {
     workbook: nextWorkbook,
     inverse: {type: CommandType.SET_RANGE, sheetId, cells: oldCells},
@@ -206,6 +279,7 @@ export function applyWorkbookCommand(workbook, command) {
   if (command.type === CommandType.SET_RANGE) return applySetRange(workbook, command);
   if (command.type === CommandType.CLEAR_RANGE) return applyClearRange(workbook, command);
   if (command.type === CommandType.SET_RANGE_FORMAT) return applySetRangeFormat(workbook, command);
+  if (command.type === CommandType.SORT_RANGE) return applySortRange(workbook, command);
   if (command.type === CommandType.RESIZE_ROW) return applyResizeDimension(workbook, command, 'row');
   if (command.type === CommandType.RESIZE_COLUMN) return applyResizeDimension(workbook, command, 'col');
   if (command.type === CommandType.ADD_SHEET) return applyAddSheet(workbook, command);

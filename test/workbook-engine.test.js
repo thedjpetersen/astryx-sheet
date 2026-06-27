@@ -204,6 +204,39 @@ test('range format commands format display values and undo cleanly', () => {
   assert.equal(workbook.sheets.get('sheet-1').cells.get('0:0').format, undefined);
 });
 
+test('sort range command orders rows and restores with undo', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_RANGE,
+    cells: [
+      {row: 0, col: 0, value: 'Name'},
+      {row: 0, col: 1, value: 'Score'},
+      {row: 1, col: 0, value: 'Ada'},
+      {row: 1, col: 1, value: '42'},
+      {row: 2, col: 0, value: 'Grace'},
+      {row: 2, col: 1, value: '99'},
+      {row: 3, col: 0, value: 'Linus'},
+      {row: 3, col: 1, value: '7'},
+    ],
+  });
+
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SORT_RANGE,
+    range: {r1: 0, c1: 0, r2: 3, c2: 1},
+    hasHeader: true,
+    sortBy: [{col: 1, direction: 'desc', type: 'number'}],
+  });
+
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 0), 'Grace');
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 2, 0), 'Ada');
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 3, 0), 'Linus');
+
+  workbook = undo(workbook);
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 0), 'Ada');
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 2, 0), 'Grace');
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 3, 0), 'Linus');
+});
+
 test('explicit blank cells can override generated defaults', () => {
   let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
   workbook = dispatchCommand(workbook, {type: CommandType.SET_CELL, row: 0, col: 0, value: ''});
