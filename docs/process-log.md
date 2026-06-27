@@ -41,6 +41,7 @@
 - Added headless workbook persistence helpers for saving/loading controller snapshots through host-provided storage adapters.
 - Added command journal helpers for recording, pausing, subscribing to, and replaying controller commands.
 - Expanded formula evaluation with argument parsing, comparisons, `IF`, logical functions, scalar math helpers, and text helpers.
+- Added a dependency-free SpreadsheetML XML adapter for Excel-readable multi-sheet workbook import/export.
 
 ## Current Direction
 
@@ -49,4 +50,4 @@ The package should grow around two public layers:
 - A workbook engine that can run without React and eventually own Excel-scale state, formulas, commands, history, import/export, and collaboration hooks.
 - A virtualized React grid that consumes the engine and can be embedded with or without the Astryx toolbar and themes.
 
-The next implementation pass should continue expanding file-format coverage, then tighten the React shell around the headless controller APIs.
+The next implementation pass should tighten the React shell around the headless controller APIs, then continue expanding Excel-compatible file adapters.

@@ -38,8 +38,10 @@ import {
   replayCommandJournal,
   redo,
   serializeWorkbook,
+  spreadsheetMLToWorkbook,
   undo,
   validateCellValue,
+  workbookToSpreadsheetML,
 } from '../src/spreadsheet/engine/index.js';
 
 test('workbook commands update sparse cells and evaluate formulas', () => {
@@ -603,4 +605,34 @@ test('workbook snapshots round-trip sheet and cell data', () => {
   assert.equal(restored.sheets.get('sheet-1').name, 'Inputs');
   assert.equal(restored.sheets.get('sheet-1').colWidths.get(3), 180);
   assert.equal(getCellRawValue(restored, 'sheet-1', 2, 3), 'Persisted');
+});
+
+test('spreadsheetml export and import preserve workbook sheet data', () => {
+  let workbook = createWorkbook({sheets: [
+    {id: 'sheet-1', name: 'Inputs', rowCount: 20, colCount: 10},
+    {id: 'sheet-2', name: 'Model', rowCount: 30, colCount: 12},
+  ], activeSheetId: 'sheet-1'});
+  workbook = dispatchCommand(workbook, {type: CommandType.SET_CELL, sheetId: 'sheet-1', row: 0, col: 0, value: 'Revenue & Costs'});
+  workbook = dispatchCommand(workbook, {type: CommandType.SET_CELL, sheetId: 'sheet-1', row: 0, col: 1, value: '42'});
+  workbook = dispatchCommandWithRecalculation(workbook, {type: CommandType.SET_CELL, sheetId: 'sheet-1', row: 0, col: 2, formula: '=B1*2'}).workbook;
+  workbook = dispatchCommand(workbook, {type: CommandType.RESIZE_COLUMN, sheetId: 'sheet-1', col: 1, size: 144});
+  workbook = dispatchCommand(workbook, {type: CommandType.RESIZE_ROW, sheetId: 'sheet-1', row: 0, size: 32});
+  workbook = dispatchCommand(workbook, {type: CommandType.SET_CELL, sheetId: 'sheet-2', row: 1, col: 0, value: 'Second sheet'});
+
+  const xml = workbookToSpreadsheetML(workbook);
+  assert.match(xml, /<Workbook/);
+  assert.match(xml, /ss:Name="Inputs"/);
+  assert.match(xml, /Revenue &amp; Costs/);
+
+  const restored = spreadsheetMLToWorkbook(xml);
+
+  assert.equal(restored.sheetOrder.length, 2);
+  assert.equal(restored.sheets.get('sheet-1').name, 'Inputs');
+  assert.equal(restored.sheets.get('sheet-2').name, 'Model');
+  assert.equal(getCellRawValue(restored, 'sheet-1', 0, 0), 'Revenue & Costs');
+  assert.equal(getCellRawValue(restored, 'sheet-1', 0, 2), '=B1*2');
+  assert.equal(restored.sheets.get('sheet-1').cells.get('0:2').computedValue, 84);
+  assert.equal(restored.sheets.get('sheet-1').colWidths.get(1), 144);
+  assert.equal(restored.sheets.get('sheet-1').rowHeights.get(0), 32);
+  assert.equal(getCellRawValue(restored, 'sheet-2', 1, 0), 'Second sheet');
 });

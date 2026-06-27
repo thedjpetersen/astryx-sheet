@@ -33,7 +33,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - React toolbar actions for applying common engine-backed number formats to the current selection
 - Undoable engine range sorting with header-aware, numeric, date, and text comparison
 - React toolbar actions for sorting the selected range by the active column
-- CSV, TSV, and HTML table import/export helpers for embedding and data interchange
+- CSV, TSV, HTML table, and SpreadsheetML XML import/export helpers for embedding and data interchange
 - Workbook-level named ranges with undo/redo and snapshot serialization
 - Named ranges participate in formula dependency tracking and cached recalculation
 - Multi-sheet workbook commands for adding, activating, renaming, and removing sheets with undo/redo
@@ -56,6 +56,7 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - Headless `createWorkbookController` API for non-React command dispatch, subscriptions, history, recalculation, and snapshots
 - Headless `createWorkbookPersistence` helpers for binding controller snapshots to host storage, including an in-memory adapter for tests and non-browser runtimes
 - Headless command journal helpers for recording and replaying controller commands in collaboration or audit-log workflows
+- SpreadsheetML XML adapter for dependency-free Excel-readable workbook import/export
 - Workbook engine primitives for sparse sheets, active-sheet state, cells, formulas, commands, undo/redo, TSV clipboard data, and JSON snapshots
 
 ## Why this exists

@@ -6,6 +6,7 @@ export {DelimitedFormat, createImportDelimitedCommand, delimiterForFormat, parse
 export {createImportHtmlTableCommand, parseHtmlTable, rangeToHtmlTable} from './html.js';
 export {bindWorkbookCommandJournal, createCommandJournal, replayCommandJournal} from './journal.js';
 export {createMemoryWorkbookStorage, createWorkbookPersistence, createWorkbookStorageAdapter} from './persistence.js';
+export {spreadsheetMLToWorkbook, workbookToSpreadsheetML} from './spreadsheetml.js';
 export {dispatchCommandWithRecalculation, evaluateCellForCache, getCachedCellDisplayValue, recalculateSheet, recalculateWorkbook} from './calculation.js';
 export {buildDependencyGraph, collectDependentCells, extractFormulaReferences, getFormulaRecalculationOrder} from './dependencies.js';
 export {cloneFilter, createFilter, createFilterStore, getVisibleRowsForFilter, getVisibleRowsForSheet, matchesFilterCriterion} from './filters.js';
