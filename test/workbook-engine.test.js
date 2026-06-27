@@ -4,6 +4,7 @@ import {cellAddress} from '../src/spreadsheet/model/address.js';
 import {
   CommandType,
   createCopyRangeCommand,
+  createImportDelimitedCommand,
   createPasteTsvCommand,
   createWorkbook,
   deserializeWorkbook,
@@ -16,7 +17,9 @@ import {
   getCellDisplayValue,
   getCellRawValue,
   NumberFormatType,
+  parseDelimited,
   recalculateWorkbook,
+  rangeToDelimited,
   rangeToTsv,
   redo,
   serializeWorkbook,
@@ -88,6 +91,16 @@ test('range clear and TSV paste are command-compatible', () => {
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 0), '');
   workbook = undo(workbook);
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 0), 'Ada');
+});
+
+test('delimited import and export handle csv quoting', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, createImportDelimitedCommand('"Name","Note"\n"Ada","quote ""inside"""\n"Grace","line, comma"', {row: 0, col: 0}));
+
+  assert.deepEqual(parseDelimited('"A,B",C'), [['A,B', 'C']]);
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 1), 'quote "inside"');
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 2, 1), 'line, comma');
+  assert.equal(rangeToDelimited(workbook, {r1: 0, c1: 0, r2: 2, c2: 1}), 'Name,Note\nAda,"quote ""inside"""\nGrace,"line, comma"');
 });
 
 test('copy range command preserves metadata and translates relative formulas', () => {
