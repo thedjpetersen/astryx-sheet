@@ -797,6 +797,157 @@ button, input { font: inherit; }
   font-size: 10px;
   line-height: 1.2;
 }
+.ribbon-color-control {
+  display: grid;
+  gap: 7px;
+  margin-top: 5px;
+  padding: 7px;
+  border-top: 1px solid var(--color-border);
+}
+.ribbon-color-preview {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+.ribbon-color-preview-swatch {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--color-border-emphasized);
+  border-radius: 5px;
+}
+.ribbon-color-preview-text {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.ribbon-color-label {
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+.ribbon-color-value {
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-code);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.ribbon-color-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 24px);
+  gap: 5px;
+}
+.ribbon-color-swatch-button {
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--color-border-emphasized);
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-background-surface) 70%, transparent);
+}
+.ribbon-color-swatch-button:hover, .ribbon-color-swatch-button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.ribbon-color-form {
+  display: grid;
+  grid-template-columns: 28px minmax(86px, 1fr) auto;
+  gap: 5px;
+  align-items: center;
+}
+.ribbon-color-picker {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--color-border-emphasized);
+  border-radius: 5px;
+  background: transparent;
+}
+.ribbon-hex-input {
+  min-width: 0;
+  height: 28px;
+  padding: 0 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: var(--color-background-surface);
+  color: var(--color-text-primary);
+  font: 11px var(--font-family-code);
+  text-transform: uppercase;
+}
+.ribbon-color-apply, .ribbon-color-clear {
+  appearance: none;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: var(--color-background-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 11px;
+}
+.ribbon-color-apply:hover:not(:disabled), .ribbon-color-clear:hover {
+  border-color: var(--color-border-emphasized);
+  background: var(--color-overlay-hover);
+}
+.ribbon-color-apply:disabled {
+  color: var(--color-text-disabled);
+  opacity: .55;
+}
+.ribbon-color-clear {
+  justify-self: start;
+}
+.ribbon-group-selection {
+  min-width: 176px;
+}
+.ribbon-group-selection .ribbon-group-actions {
+  display: flex;
+}
+.selection-inspector {
+  min-width: 160px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 5px 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--color-background-surface) 78%, transparent);
+}
+.selection-inspector-address {
+  color: var(--color-text-primary);
+  font: 700 12px var(--font-family-code);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.selection-inspector-meta {
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.selection-inspector-swatches {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.selection-style-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+}
+.selection-style-swatch {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--color-border-emphasized);
+  border-radius: 4px;
+  background-image:
+    linear-gradient(45deg, color-mix(in srgb, var(--color-border) 42%, transparent) 25%, transparent 25%),
+    linear-gradient(-45deg, color-mix(in srgb, var(--color-border) 42%, transparent) 25%, transparent 25%);
+  background-size: 6px 6px;
+}
 .ribbon-group-view { min-width: 330px; }
 .ribbon-group-view .ribbon-group-actions { display: flex; }
 .toolbar-spacer { flex: 1 0 12px; }

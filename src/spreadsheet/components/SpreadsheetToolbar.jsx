@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {Text} from '@astryxdesign/core/Text';
 import {Heading} from '@astryxdesign/core/Heading';
 import {Switch} from '@astryxdesign/core/Switch';
@@ -43,9 +43,53 @@ import {THEME_OPTIONS} from '../../app/themes.js';
 import {FormulaEditor} from './FormulaEditor.jsx';
 
 const iconProps = {size: 16, strokeWidth: 2, 'aria-hidden': true};
+const DEFAULT_FILL_COLOR = '#e0f2fe';
+const DEFAULT_TEXT_COLOR = '#075985';
+const DEFAULT_BORDER_COLOR = '#64748b';
+const FILL_SWATCHES = [
+  {label: 'Blue', color: '#e0f2fe'},
+  {label: 'Green', color: '#dcfce7'},
+  {label: 'Yellow', color: '#fef3c7'},
+  {label: 'Red', color: '#fee2e2'},
+  {label: 'Purple', color: '#ede9fe'},
+  {label: 'Gray', color: '#f1f5f9'},
+];
+const TEXT_SWATCHES = [
+  {label: 'Blue', color: '#075985'},
+  {label: 'Green', color: '#166534'},
+  {label: 'Red', color: '#991b1b'},
+  {label: 'Purple', color: '#6d28d9'},
+  {label: 'Slate', color: '#334155'},
+  {label: 'Black', color: '#0f172a'},
+];
+const BORDER_SWATCHES = [
+  {label: 'Slate', color: '#64748b'},
+  {label: 'Black', color: '#0f172a'},
+  {label: 'Blue', color: '#0284c7'},
+  {label: 'Green', color: '#16a34a'},
+  {label: 'Red', color: '#dc2626'},
+  {label: 'Amber', color: '#d97706'},
+];
 
 function icon(IconComponent, size = 16) {
   return <IconComponent {...iconProps} size={size} />;
+}
+
+function normalizeHexColor(value, fallback = DEFAULT_FILL_COLOR) {
+  const text = String(value || '').trim();
+  const hex = text.startsWith('#') ? text : `#${text}`;
+  if (/^#[0-9a-f]{6}$/i.test(hex)) return hex.toLowerCase();
+  if (/^#[0-9a-f]{3}$/i.test(hex)) {
+    const [, r, g, b] = hex.toLowerCase();
+    return `#${r}${r}${g}${g}${b}${b}`;
+  }
+  return fallback;
+}
+
+function isValidHexColor(value) {
+  const text = String(value || '').trim();
+  const hex = text.startsWith('#') ? text : `#${text}`;
+  return /^#[0-9a-f]{6}$/i.test(hex) || /^#[0-9a-f]{3}$/i.test(hex);
 }
 
 function RibbonGroup({label, children, className = ''}) {
@@ -128,6 +172,94 @@ function RibbonMenuItem({label, onSelect, icon: itemIcon, swatch, detail, isDisa
   );
 }
 
+function RibbonColorControl({label, value, fallbackColor, swatches, onApply, onClear}) {
+  const initialColor = useMemo(() => normalizeHexColor(value, fallbackColor), [fallbackColor, value]);
+  const [hexValue, setHexValue] = useState(initialColor);
+  useEffect(() => setHexValue(initialColor), [initialColor]);
+  const normalizedValue = isValidHexColor(hexValue) ? normalizeHexColor(hexValue, fallbackColor) : initialColor;
+  const canApply = isValidHexColor(hexValue);
+  return (
+    <div className="ribbon-color-control" role="group" aria-label={label}>
+      <div className="ribbon-color-preview">
+        <span className="ribbon-color-preview-swatch" style={{background: normalizedValue}} />
+        <span className="ribbon-color-preview-text">
+          <span className="ribbon-color-label">{label}</span>
+          <span className="ribbon-color-value">{canApply ? normalizedValue : 'Invalid hex'}</span>
+        </span>
+      </div>
+      <div className="ribbon-color-swatches" aria-label={`${label} swatches`}>
+        {swatches.map((item) => (
+          <button
+            key={item.color}
+            className="ribbon-color-swatch-button"
+            type="button"
+            aria-label={`${label} ${item.label}`}
+            title={`${item.label} ${item.color}`}
+            style={{background: item.color}}
+            onClick={(event) => {
+              onApply(item.color);
+              closeRibbonMenu(event);
+            }} />
+        ))}
+      </div>
+      <form
+        className="ribbon-color-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!canApply) return;
+          onApply(normalizedValue);
+          closeRibbonMenu(event);
+        }}>
+        <input
+          className="ribbon-color-picker"
+          type="color"
+          aria-label={`${label} picker`}
+          value={normalizedValue}
+          onChange={(event) => setHexValue(event.target.value)} />
+        <input
+          className="ribbon-hex-input"
+          aria-label={`${label} hex`}
+          value={hexValue}
+          spellCheck={false}
+          maxLength={7}
+          onChange={(event) => setHexValue(event.target.value)} />
+        <button className="ribbon-color-apply" type="submit" disabled={!canApply}>Apply</button>
+      </form>
+      {onClear ? (
+        <button
+          className="ribbon-color-clear"
+          type="button"
+          onClick={(event) => {
+            onClear();
+            closeRibbonMenu(event);
+          }}>
+          Clear
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function SelectionInspector({selectionLabel, selectionShapeLabel, selectionCellCount, currentFillColor, currentTextColor}) {
+  const countLabel = Number.isFinite(selectionCellCount) ? `${selectionCellCount.toLocaleString()} cell${selectionCellCount === 1 ? '' : 's'}` : '';
+  return (
+    <div className="selection-inspector" aria-label="Current selection">
+      <div className="selection-inspector-address">{selectionLabel}</div>
+      <div className="selection-inspector-meta">{selectionShapeLabel}{countLabel ? ` • ${countLabel}` : ''}</div>
+      <div className="selection-inspector-swatches" aria-label="Selection style">
+        <span className="selection-style-token">
+          <span className="selection-style-swatch" style={{background: currentFillColor || 'transparent'}} />
+          Fill
+        </span>
+        <span className="selection-style-token">
+          <span className="selection-style-swatch" style={{background: currentTextColor || 'transparent'}} />
+          Text
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function activateRibbonTab(event, targetGroup) {
   const tab = event.currentTarget;
   const topbar = tab.closest('.topbar');
@@ -162,6 +294,11 @@ export function SpreadsheetToolbar({
   title,
   subtitle,
   activeAddress,
+  selectionLabel = activeAddress,
+  selectionShapeLabel = '1 x 1',
+  selectionCellCount = 1,
+  currentFillColor,
+  currentTextColor,
   formulaDraft,
   formulaPreview,
   formulaCursorPosition,
@@ -279,6 +416,15 @@ export function SpreadsheetToolbar({
             <RibbonMenuItem label="Copy active range" icon={icon(Copy)} onSelect={onCopySelection} detail="Use the current selection rectangle" />
           </RibbonMenu>
         </RibbonGroup>
+        <RibbonGroup label="Selection" className="ribbon-group-selection">
+          <SelectionInspector
+            selectionLabel={selectionLabel}
+            selectionShapeLabel={selectionShapeLabel}
+            selectionCellCount={selectionCellCount}
+            currentFillColor={currentFillColor}
+            currentTextColor={currentTextColor}
+          />
+        </RibbonGroup>
         <RibbonGroup label="Edit">
           <RibbonMenu label="History" icon={icon(Undo2)}>
             <RibbonMenuItem label="Undo" icon={icon(Undo2)} onSelect={onUndo} isDisabled={!canUndo} />
@@ -331,18 +477,39 @@ export function SpreadsheetToolbar({
             <RibbonMenuItem label="All borders" icon={icon(Square)} onSelect={onStyleBorder} />
             <RibbonMenuItem label="Dark borders" icon={icon(Square)} onSelect={() => onApplyStyle?.({border: '1px solid #0f172a'}, 'dark border')} />
             <RibbonMenuItem label="No borders" icon={icon(Square)} onSelect={() => onApplyStyle?.({border: null}, 'no border')} />
+            <RibbonColorControl
+              label="Border color"
+              value={DEFAULT_BORDER_COLOR}
+              fallbackColor={DEFAULT_BORDER_COLOR}
+              swatches={BORDER_SWATCHES}
+              onApply={(color) => onApplyStyle?.({border: `1px solid ${color}`}, `border ${color}`)}
+              onClear={() => onApplyStyle?.({border: null}, 'no border')} />
           </RibbonMenu>
           <RibbonMenu label="Fill" icon={icon(PaintBucket)}>
             <RibbonMenuItem label="Light blue" swatch="#e0f2fe" onSelect={onStyleFill} />
             <RibbonMenuItem label="Soft green" swatch="#dcfce7" onSelect={() => onApplyStyle?.({backgroundColor: '#dcfce7'}, 'green fill')} />
             <RibbonMenuItem label="Warm yellow" swatch="#fef3c7" onSelect={() => onApplyStyle?.({backgroundColor: '#fef3c7'}, 'yellow fill')} />
             <RibbonMenuItem label="Clear fill" swatch="transparent" onSelect={() => onApplyStyle?.({backgroundColor: null}, 'clear fill')} />
+            <RibbonColorControl
+              label="Fill color"
+              value={currentFillColor}
+              fallbackColor={DEFAULT_FILL_COLOR}
+              swatches={FILL_SWATCHES}
+              onApply={(color) => onApplyStyle?.({backgroundColor: color}, `fill ${color}`)}
+              onClear={() => onApplyStyle?.({backgroundColor: null}, 'clear fill')} />
           </RibbonMenu>
           <RibbonMenu label="Text color" icon={icon(Type)}>
             <RibbonMenuItem label="Blue text" swatch="#075985" onSelect={onStyleText} />
             <RibbonMenuItem label="Green text" swatch="#166534" onSelect={() => onApplyStyle?.({color: '#166534'}, 'green text')} />
             <RibbonMenuItem label="Red text" swatch="#991b1b" onSelect={() => onApplyStyle?.({color: '#991b1b'}, 'red text')} />
             <RibbonMenuItem label="Default text" swatch="transparent" onSelect={() => onApplyStyle?.({color: null}, 'default text')} />
+            <RibbonColorControl
+              label="Custom text color"
+              value={currentTextColor}
+              fallbackColor={DEFAULT_TEXT_COLOR}
+              swatches={TEXT_SWATCHES}
+              onApply={(color) => onApplyStyle?.({color}, `text ${color}`)}
+              onClear={() => onApplyStyle?.({color: null}, 'default text')} />
           </RibbonMenu>
         </RibbonGroup>
         <RibbonGroup label="Insert">

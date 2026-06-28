@@ -109,6 +109,28 @@ function defaultRangeName(selection) {
   return `Range_${cellAddress(selection.r1, selection.c1)}_${cellAddress(selection.r2, selection.c2)}`.replace(/[^A-Za-z0-9_]/g, '_');
 }
 
+function describeSelection(selection, rowCount, colCount) {
+  const rowSpan = selection.r2 - selection.r1 + 1;
+  const colSpan = selection.c2 - selection.c1 + 1;
+  const cellCount = rowSpan * colSpan;
+  const coversAllRows = selection.r1 === 0 && selection.r2 === rowCount - 1;
+  const coversAllCols = selection.c1 === 0 && selection.c2 === colCount - 1;
+  let label = `${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`;
+  if (rowSpan === 1 && colSpan === 1) label = cellAddress(selection.r1, selection.c1);
+  else if (coversAllCols && !coversAllRows) label = selection.r1 === selection.r2 ? `Row ${selection.r1 + 1}` : `Rows ${selection.r1 + 1}:${selection.r2 + 1}`;
+  else if (coversAllRows && !coversAllCols) label = selection.c1 === selection.c2 ? `Column ${columnName(selection.c1)}` : `Columns ${columnName(selection.c1)}:${columnName(selection.c2)}`;
+  else if (coversAllRows && coversAllCols) label = 'Entire sheet';
+
+  const shapeLabel = coversAllRows && coversAllCols
+    ? `${rowCount.toLocaleString()} x ${colCount.toLocaleString()}`
+    : coversAllCols
+      ? `${rowSpan.toLocaleString()} row${rowSpan === 1 ? '' : 's'} x all columns`
+      : coversAllRows
+        ? `all rows x ${colSpan.toLocaleString()} column${colSpan === 1 ? '' : 's'}`
+        : `${rowSpan.toLocaleString()} x ${colSpan.toLocaleString()}`;
+  return {label, shapeLabel, cellCount};
+}
+
 export function Spreadsheet({
   title = DEFAULT_TITLE,
   subtitle = DEFAULT_SUBTITLE,
@@ -1326,6 +1348,13 @@ export function Spreadsheet({
   const totalWidth = colMetrics.total();
   const totalHeight = rowMetrics.total();
   const activeAddress = cellAddress(activeCell.row, activeCell.col);
+  const selectionDescription = useMemo(
+    () => describeSelection(committedSelection || normalizeSelection(activeCell, activeCell), rowCount, colCount),
+    [activeCell, colCount, committedSelection, rowCount],
+  );
+  const activeCellRecord = getCellRecord(workbook, activeSheet.id, activeCell.row, activeCell.col);
+  const currentFillColor = activeCellRecord?.style?.backgroundColor;
+  const currentTextColor = activeCellRecord?.style?.color;
   const formulaPreview = useMemo(() => previewFormulaDraft(
     workbook,
     activeSheet.id,
@@ -1365,6 +1394,11 @@ export function Spreadsheet({
           title={title}
           subtitle={subtitle}
           activeAddress={activeAddress}
+          selectionLabel={selectionDescription.label}
+          selectionShapeLabel={selectionDescription.shapeLabel}
+          selectionCellCount={selectionDescription.cellCount}
+          currentFillColor={currentFillColor}
+          currentTextColor={currentTextColor}
           formulaDraft={formulaDraft}
           formulaPreview={formulaPreview}
           formulaCursorPosition={formulaCursorPosition}

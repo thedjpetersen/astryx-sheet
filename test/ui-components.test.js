@@ -138,6 +138,11 @@ function toolbarProps(overrides = {}) {
       title: 'Astryx Sheet',
       subtitle: 'UI test',
       activeAddress: 'B2',
+      selectionLabel: 'B2:C3',
+      selectionShapeLabel: '2 x 2',
+      selectionCellCount: 4,
+      currentFillColor: '#e0f2fe',
+      currentTextColor: '#075985',
       formulaDraft: '=SUM(A1:A3)',
       formulaPreview: {displayValue: '6', diagnostics: []},
       formulaCursorPosition: 4,
@@ -241,6 +246,16 @@ test('spreadsheet toolbar rich command controls are wired to their callbacks', a
   for (const label of ['Paste', 'Copy', 'Edit', 'Clear cells', 'Number', 'Currency', 'Percent', 'Date', 'Bold', 'Border', 'Fill', 'Text color', 'Rows', 'Columns', 'Sort', 'Filter', 'Merge', 'Size', 'Validation', 'Highlight', 'Names']) {
     assert.ok(menuLabels.includes(label), `${label} rich control should render`);
   }
+
+  const selectionInspector = collectElements(toolbar, (element) => element.type?.name === 'SelectionInspector')[0];
+  assert.equal(selectionInspector.props.selectionLabel, 'B2:C3');
+  assert.equal(selectionInspector.props.selectionShapeLabel, '2 x 2');
+  assert.equal(selectionInspector.props.selectionCellCount, 4);
+
+  const colorControls = collectElements(toolbar, (element) => element.type?.name === 'RibbonColorControl');
+  assert.deepEqual(colorControls.map((control) => control.props.label), ['Border color', 'Fill color', 'Custom text color']);
+  assert.equal(colorControls.find((control) => control.props.label === 'Fill color').props.value, '#e0f2fe');
+  assert.equal(colorControls.find((control) => control.props.label === 'Custom text color').props.value, '#075985');
 
   const items = collectElements(toolbar, (element) => element.type?.name === 'RibbonMenuItem');
   const expected = new Map([

@@ -146,6 +146,7 @@
 - Wired row and column headers as selectable controls, including header-drag ranges and context-menu entry points, and fixed toolbar range actions so formatting, styling, and sorting preserve generated default cell values instead of materializing blanks.
 - Added Shift-click row and column header range selection, converted ribbon tabs into clickable controls, and exposed active-row/column insert commands through the Insert ribbon group.
 - Reworked the spreadsheet ribbon commands into rich popover controls with grouped options for clipboard, editing, clearing, number formats, currencies, percentages, dates, style palettes, rows, columns, sorting, filters, merges, sizing, validation, highlighting, and named ranges.
+- Added a live selection inspector to the ribbon and expanded color controls with current-style previews, palette swatches, native color pickers, hex inputs, apply actions, and clear actions for fill, text, and border colors.
 
 ## Current Direction
 
