@@ -10,6 +10,45 @@ Live demo: https://thedjpetersen.github.io/astryx-sheet/
 
 It demonstrates how to combine design-system primitives with high-performance spreadsheet interaction patterns: large-grid virtualization, fixed headers, editable cells, formulas, multi-cell selection, row/column resizing, and ref-driven hot paths.
 
+## Progressive Adoption
+
+You can adopt Astryx Sheet in layers instead of taking the full demo shell:
+
+- Use the complete Astryx-flavored spreadsheet with `<Spreadsheet />` when you want the grid, formula editor, ribbon, sheet tabs, themes, validation, formatting, and workbook controls in one surface.
+- Use the spreadsheet surface with your own product chrome by passing a host-created `workbookController` and hiding optional UI such as the toolbar, stats, theme controls, or theme wrapper.
+- Use the headless workbook engine without React for commands, formulas, snapshots, persistence, imports/exports, history, recalculation, and tests.
+- Use focused model utilities such as address helpers, formula catalog metadata, formula templates, TSV/HTML/SpreadsheetML adapters, and command builders when you only need one spreadsheet capability.
+
+```jsx
+import {CommandType, Spreadsheet, createWorkbookController} from 'astryx-sheet';
+
+const workbookController = createWorkbookController({
+  sheets: [{id: 'inputs', name: 'Inputs', rowCount: 100000, colCount: 2000}],
+  activeSheetId: 'inputs',
+});
+
+workbookController.dispatch({
+  type: CommandType.SET_CELL,
+  sheetId: 'inputs',
+  row: 0,
+  col: 0,
+  value: 'Revenue',
+});
+
+export function EmbeddedSheet({onSave}) {
+  return (
+    <Spreadsheet
+      workbookController={workbookController}
+      showToolbar={false}
+      showStats={false}
+      showThemeControls={false}
+      withTheme={false}
+      onWorkbookChange={({workbook}) => onSave(workbook)}
+    />
+  );
+}
+```
+
 ## Features
 
 - Astryx themes and component primitives for the app shell, toolbar, buttons, inputs, badges, tokens, progress, status, and inspector table
@@ -36,6 +75,8 @@ It demonstrates how to combine design-system primitives with high-performance sp
 - React toolbar actions for applying common engine-backed number formats to the current selection
 - Engine-level cell styling for bold text, borders, fill color, text color, and alignment with undo/redo, snapshots, SpreadsheetML style round trips, and grid rendering
 - React toolbar actions for applying common engine-backed cell styles to the current selection
+- Sparse range-level formats and styles for header-sized selections, so whole columns/rows can receive fill, text color, and number formats without materializing every cell
+- Profiler-backed bulk-selection guardrails for large header formatting and sorting paths
 - Undoable engine range sorting with header-aware, numeric, date, and text comparison
 - React toolbar actions for sorting the selected range by the active column
 - CSV, TSV, HTML table, and SpreadsheetML XML import/export helpers for embedding and data interchange, including formulas, sheet dimensions, row/column sizes, number formats, cell styles, notes, hyperlinks, conditional formats, named ranges, and merged ranges
@@ -117,8 +158,9 @@ Then open the Vite URL printed in your terminal.
 ```bash
 npm run dev      # start local development
 npm test         # run React-independent workbook engine tests
+npm run profile:bulk  # run V8 CPU profiling for bulk header formatting/sort paths
 npm run build    # production build
-npm run build && rm -rf docs && cp -R dist docs  # refresh GitHub Pages demo
+npm run build && rm -f docs/assets/index-*.js docs/assets/index-*.css && cp dist/index.html docs/index.html && cp dist/assets/* docs/assets/  # refresh GitHub Pages demo files
 npm run preview  # preview the production build
 ```
 

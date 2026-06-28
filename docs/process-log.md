@@ -148,6 +148,15 @@
 - Reworked the spreadsheet ribbon commands into rich popover controls with grouped options for clipboard, editing, clearing, number formats, currencies, percentages, dates, style palettes, rows, columns, sorting, filters, merges, sizing, validation, highlighting, and named ranges.
 - Added a live selection inspector to the ribbon and expanded color controls with current-style previews, palette swatches, native color pickers, hex inputs, apply actions, and clear actions for fill, text, and border colors.
 
+## 2026-06-28
+
+- Added sparse `rangeStyles` and `rangeFormats` sheet metadata so large header selections can be styled or formatted without materializing every covered cell.
+- Updated effective cell style/format resolution so rendered cells and display formatting merge range-level metadata with explicit cell records.
+- Added bulk sort guardrails in both the UI and engine so full-column/full-row sorts fail quickly with guidance instead of enumerating huge selections.
+- Added `npm run profile:bulk`, which runs V8 CPU profiling for whole-column style dispatch, whole-column format dispatch, bulk changed-key tracking, and large-sort guard timing.
+- Added engine tests for sparse bulk style/format commands, snapshot round trips, existing-cell override behavior, changed-key tracking, and large-sort rejection.
+- Updated the documentation around progressive adoption, including complete-sheet, controlled-sheet, headless-engine, and focused-primitive usage paths.
+
 ## Current Direction
 
 The package should grow around two public layers:

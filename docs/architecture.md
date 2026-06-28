@@ -12,6 +12,17 @@ Astryx Sheet is now split as a source package instead of a single demo file. The
 - The formula model exports a function catalog and formula-template helper so React and host applications can discover supported functions without duplicating evaluator-specific lists.
 - `src/styles.css` remains a separate stylesheet export for host applications.
 
+## Progressive Composition
+
+Host applications can choose how much of the sheet to use:
+
+- Complete spreadsheet: mount `Spreadsheet` with the Astryx toolbar, formula editor, workbook tabs, themes, and built-in command ribbon.
+- Controlled spreadsheet: pass a `workbookController` and hide optional UI with `showToolbar`, `showStats`, `showThemeControls`, and `withTheme` when the host owns surrounding navigation or persistence.
+- Headless workbook: use `createWorkbookController`, command builders, serialization, persistence, import/export adapters, recalculation, and history without mounting React.
+- Focused primitives: use exported address helpers, selection utilities, default-data helpers, formula catalog/template functions, clipboard adapters, and command helpers independently when a product needs only one progressive spreadsheet behavior.
+
+This split lets a host start with the full sheet, then peel away pieces as its product-specific UI hardens. It also supports the inverse path: start with formula evaluation or workbook commands in a non-React service, then add the virtualized grid later.
+
 ## Internal Layers
 
 - `src/app/` contains demo application wiring and Astryx theme registration.
@@ -20,6 +31,12 @@ Astryx Sheet is now split as a source package instead of a single demo file. The
 - `src/spreadsheet/engine/` contains the React-independent workbook core: sheets, sparse cells, a headless controller with calculation modes, persistence and journal helpers, commands, undo/redo, clipboard and fill helpers, sheet/workbook dependency graph utilities, and snapshot serialization.
 - `src/spreadsheet/model/` contains spreadsheet primitives: addresses, default data, formulas, dimensions, selections, and initial-state normalization.
 - `src/hooks/` contains reusable React infrastructure for requestAnimationFrame scheduling, element measurement, and controlled/uncontrolled props.
+
+## Performance Boundaries
+
+The grid treats viewport work and workbook mutations as separate concerns. Visible cells render through a small virtual window, while workbook state remains sparse: cells, dimensions, filters, validations, conditional formats, and now large range-level formats/styles are stored as metadata instead of expanded records. Header-sized style and format operations use sparse `rangeStyles` and `rangeFormats` rules, and oversized sorts are rejected before the engine or calculation scheduler enumerates the full header selection.
+
+Bulk behavior is covered by `npm run profile:bulk`, which runs the V8 CPU profiler against whole-column style, whole-column format, changed-cell tracking, and the large-sort guard.
 
 ## Growth Path
 
