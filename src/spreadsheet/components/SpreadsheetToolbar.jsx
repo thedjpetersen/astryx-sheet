@@ -10,6 +10,7 @@ import {
   ArrowUpZA,
   Bold,
   CalendarDays,
+  ChevronDown,
   ClipboardPaste,
   Combine,
   Contrast,
@@ -71,6 +72,62 @@ function RibbonButton({label, icon: buttonIcon, onClick, isDisabled, children, s
   );
 }
 
+function closeRibbonMenu(event) {
+  event.currentTarget.closest('[popover]')?.hidePopover?.();
+}
+
+function positionRibbonMenu(event, menuId) {
+  if (typeof document === 'undefined') return;
+  const panel = document.getElementById(menuId);
+  if (!panel) return;
+  const rect = event.currentTarget.getBoundingClientRect();
+  panel.style.setProperty('--ribbon-menu-left', `${Math.max(8, rect.left)}px`);
+  panel.style.setProperty('--ribbon-menu-top', `${rect.bottom + 4}px`);
+}
+
+function RibbonMenu({label, icon: buttonIcon, children, size = 'small'}) {
+  const menuId = `ribbon-menu-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  return (
+    <div className={`ribbon-menu ${size}`}>
+      <button
+        className={`ribbon-command ribbon-menu-summary ${size}`}
+        type="button"
+        title={label}
+        aria-label={label}
+        aria-haspopup="menu"
+        popoverTarget={menuId}
+        onClick={(event) => positionRibbonMenu(event, menuId)}>
+        <span className="ribbon-command-icon">{buttonIcon}</span>
+        {size === 'icon' ? null : <span className="ribbon-command-label">{label}</span>}
+        <span className="ribbon-menu-caret">{icon(ChevronDown, 13)}</span>
+      </button>
+      <div id={menuId} className="ribbon-menu-panel" popover="auto" role="menu" aria-label={`${label} options`}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function RibbonMenuItem({label, onSelect, icon: itemIcon, swatch, detail, isDisabled}) {
+  return (
+    <button
+      className="ribbon-menu-item"
+      type="button"
+      role="menuitem"
+      disabled={isDisabled}
+      onClick={(event) => {
+        onSelect?.();
+        closeRibbonMenu(event);
+      }}>
+      {swatch ? <span className="ribbon-menu-swatch" style={{background: swatch}} /> : <span className="ribbon-menu-item-icon">{itemIcon}</span>}
+      <span className="ribbon-menu-item-text">
+        <span className="ribbon-menu-item-label">{label}</span>
+        {detail ? <span className="ribbon-menu-item-detail">{detail}</span> : null}
+      </span>
+    </button>
+  );
+}
+
 function activateRibbonTab(event, targetGroup) {
   const tab = event.currentTarget;
   const topbar = tab.closest('.topbar');
@@ -126,14 +183,17 @@ export function SpreadsheetToolbar({
   onPasteClipboard,
   onEditActiveCell,
   onClearSelection,
+  onClearFormatting,
   onFormatNumber,
   onFormatCurrency,
   onFormatPercent,
   onFormatDate,
+  onApplyFormat,
   onStyleBold,
   onStyleBorder,
   onStyleFill,
   onStyleText,
+  onApplyStyle,
   onSortAscending,
   onSortDescending,
   onFilterSelection,
@@ -144,6 +204,8 @@ export function SpreadsheetToolbar({
   onInsertRowBelow,
   onInsertColumnLeft,
   onInsertColumnRight,
+  onDeleteActiveRow,
+  onDeleteActiveColumn,
   onValidateNumber,
   onValidateList,
   onClearValidation,
@@ -154,6 +216,9 @@ export function SpreadsheetToolbar({
   onRemoveNamedRange,
   onWidenActiveColumn,
   onTallerActiveRow,
+  onResetActiveSize,
+  onFillDown,
+  onFillRight,
   themeName,
   onThemeNameChange,
   darkMode,
@@ -205,56 +270,133 @@ export function SpreadsheetToolbar({
       ) : null}
       <div className="ribbon-tools" id="spreadsheet-ribbon-tools" aria-label="Spreadsheet commands">
         <RibbonGroup label="Clipboard">
-          <RibbonButton label="Paste" icon={icon(ClipboardPaste, 24)} onClick={onPasteClipboard} size="large" />
-          <RibbonButton label="Copy" icon={icon(Copy)} onClick={onCopySelection} />
+          <RibbonMenu label="Paste" icon={icon(ClipboardPaste, 24)} size="large">
+            <RibbonMenuItem label="Paste from clipboard" icon={icon(ClipboardPaste)} onSelect={onPasteClipboard} detail="Insert copied table text at the active cell" />
+            <RibbonMenuItem label="Paste values" icon={icon(ClipboardPaste)} onSelect={onPasteClipboard} detail="Use plain TSV or copied text" />
+          </RibbonMenu>
+          <RibbonMenu label="Copy" icon={icon(Copy)}>
+            <RibbonMenuItem label="Copy selection" icon={icon(Copy)} onSelect={onCopySelection} detail="Copy selected cells as TSV" />
+            <RibbonMenuItem label="Copy active range" icon={icon(Copy)} onSelect={onCopySelection} detail="Use the current selection rectangle" />
+          </RibbonMenu>
         </RibbonGroup>
         <RibbonGroup label="Edit">
-          <RibbonButton label="Undo" icon={icon(Undo2)} onClick={onUndo} isDisabled={!canUndo} size="icon" />
-          <RibbonButton label="Redo" icon={icon(Redo2)} onClick={onRedo} isDisabled={!canRedo} size="icon" />
-          <RibbonButton label="Edit" icon={icon(Pencil)} onClick={onEditActiveCell} />
-          <RibbonButton label="Clear" icon={icon(Eraser)} onClick={onClearSelection}>Clear cells</RibbonButton>
+          <RibbonMenu label="History" icon={icon(Undo2)}>
+            <RibbonMenuItem label="Undo" icon={icon(Undo2)} onSelect={onUndo} isDisabled={!canUndo} />
+            <RibbonMenuItem label="Redo" icon={icon(Redo2)} onSelect={onRedo} isDisabled={!canRedo} />
+          </RibbonMenu>
+          <RibbonMenu label="Edit" icon={icon(Pencil)}>
+            <RibbonMenuItem label="Edit active cell" icon={icon(Pencil)} onSelect={onEditActiveCell} detail="Open the in-cell editor" />
+            <RibbonMenuItem label="Fill down" icon={icon(UnfoldVertical)} onSelect={onFillDown} />
+            <RibbonMenuItem label="Fill right" icon={icon(UnfoldHorizontal)} onSelect={onFillRight} />
+          </RibbonMenu>
+          <RibbonMenu label="Clear cells" icon={icon(Eraser)}>
+            <RibbonMenuItem label="Clear cell values" icon={icon(Eraser)} onSelect={onClearSelection} />
+            <RibbonMenuItem label="Clear formatting" icon={icon(BrushCleaning)} onSelect={onClearFormatting} />
+            <RibbonMenuItem label="Clear validation rule" icon={icon(ListX)} onSelect={onClearValidation} />
+            <RibbonMenuItem label="Clear highlight rule" icon={icon(BrushCleaning)} onSelect={onClearConditionalFormat} />
+            <RibbonMenuItem label="Clear filter" icon={icon(FilterX)} onSelect={onClearFilter} />
+          </RibbonMenu>
         </RibbonGroup>
         <RibbonGroup label="Number">
-          <RibbonButton label="Number" icon={icon(Hash)} onClick={onFormatNumber} />
-          <RibbonButton label="Currency" icon={icon(DollarSign)} onClick={onFormatCurrency}>Currency</RibbonButton>
-          <RibbonButton label="Percent" icon={icon(Percent)} onClick={onFormatPercent}>Percent</RibbonButton>
-          <RibbonButton label="Date" icon={icon(CalendarDays)} onClick={onFormatDate} />
+          <RibbonMenu label="Number" icon={icon(Hash)}>
+            <RibbonMenuItem label="General" icon={icon(Hash)} onSelect={() => onApplyFormat?.(undefined, 'general', true)} detail="Remove number formatting" />
+            <RibbonMenuItem label="Number, 2 decimals" icon={icon(Hash)} onSelect={onFormatNumber} />
+            <RibbonMenuItem label="Number, no decimals" icon={icon(Hash)} onSelect={() => onApplyFormat?.({type: 'number', decimals: 0}, 'number')} />
+            <RibbonMenuItem label="Text" icon={icon(Type)} onSelect={() => onApplyFormat?.({type: 'text'}, 'text')} />
+          </RibbonMenu>
+          <RibbonMenu label="Currency" icon={icon(DollarSign)}>
+            <RibbonMenuItem label="US dollar" icon={icon(DollarSign)} onSelect={onFormatCurrency} detail="$1,234.00" />
+            <RibbonMenuItem label="Euro" icon={icon(DollarSign)} onSelect={() => onApplyFormat?.({type: 'currency', currency: 'EUR', decimals: 2}, 'euro')} detail="€1,234.00" />
+            <RibbonMenuItem label="British pound" icon={icon(DollarSign)} onSelect={() => onApplyFormat?.({type: 'currency', currency: 'GBP', decimals: 2}, 'pound')} detail="£1,234.00" />
+            <RibbonMenuItem label="Japanese yen" icon={icon(DollarSign)} onSelect={() => onApplyFormat?.({type: 'currency', currency: 'JPY', decimals: 0}, 'yen')} detail="¥1,234" />
+          </RibbonMenu>
+          <RibbonMenu label="Percent" icon={icon(Percent)}>
+            <RibbonMenuItem label="Percent, 1 decimal" icon={icon(Percent)} onSelect={onFormatPercent} />
+            <RibbonMenuItem label="Percent, no decimals" icon={icon(Percent)} onSelect={() => onApplyFormat?.({type: 'percent', decimals: 0}, 'percent')} />
+            <RibbonMenuItem label="Percent, 2 decimals" icon={icon(Percent)} onSelect={() => onApplyFormat?.({type: 'percent', decimals: 2}, 'percent')} />
+          </RibbonMenu>
+          <RibbonMenu label="Date" icon={icon(CalendarDays)}>
+            <RibbonMenuItem label="Default date" icon={icon(CalendarDays)} onSelect={onFormatDate} />
+            <RibbonMenuItem label="Short date" icon={icon(CalendarDays)} onSelect={() => onApplyFormat?.({type: 'date', dateStyle: 'short'}, 'short date')} />
+            <RibbonMenuItem label="Long date" icon={icon(CalendarDays)} onSelect={() => onApplyFormat?.({type: 'date', dateStyle: 'long'}, 'long date')} />
+          </RibbonMenu>
         </RibbonGroup>
         <RibbonGroup label="Style">
-          <RibbonButton label="Bold" icon={icon(Bold)} onClick={onStyleBold} />
-          <RibbonButton label="Border" icon={icon(Square)} onClick={onStyleBorder} />
-          <RibbonButton label="Fill" icon={icon(PaintBucket)} onClick={onStyleFill} />
-          <RibbonButton label="Text color" icon={icon(Type)} onClick={onStyleText}>Text color</RibbonButton>
+          <RibbonMenu label="Bold" icon={icon(Bold)}>
+            <RibbonMenuItem label="Bold" icon={icon(Bold)} onSelect={onStyleBold} />
+            <RibbonMenuItem label="Normal weight" icon={icon(Type)} onSelect={() => onApplyStyle?.({fontWeight: null}, 'normal weight')} />
+            <RibbonMenuItem label="Header emphasis" icon={icon(Bold)} onSelect={() => onApplyStyle?.({fontWeight: 700, backgroundColor: '#f1f5f9'}, 'header emphasis')} />
+          </RibbonMenu>
+          <RibbonMenu label="Border" icon={icon(Square)}>
+            <RibbonMenuItem label="All borders" icon={icon(Square)} onSelect={onStyleBorder} />
+            <RibbonMenuItem label="Dark borders" icon={icon(Square)} onSelect={() => onApplyStyle?.({border: '1px solid #0f172a'}, 'dark border')} />
+            <RibbonMenuItem label="No borders" icon={icon(Square)} onSelect={() => onApplyStyle?.({border: null}, 'no border')} />
+          </RibbonMenu>
+          <RibbonMenu label="Fill" icon={icon(PaintBucket)}>
+            <RibbonMenuItem label="Light blue" swatch="#e0f2fe" onSelect={onStyleFill} />
+            <RibbonMenuItem label="Soft green" swatch="#dcfce7" onSelect={() => onApplyStyle?.({backgroundColor: '#dcfce7'}, 'green fill')} />
+            <RibbonMenuItem label="Warm yellow" swatch="#fef3c7" onSelect={() => onApplyStyle?.({backgroundColor: '#fef3c7'}, 'yellow fill')} />
+            <RibbonMenuItem label="Clear fill" swatch="transparent" onSelect={() => onApplyStyle?.({backgroundColor: null}, 'clear fill')} />
+          </RibbonMenu>
+          <RibbonMenu label="Text color" icon={icon(Type)}>
+            <RibbonMenuItem label="Blue text" swatch="#075985" onSelect={onStyleText} />
+            <RibbonMenuItem label="Green text" swatch="#166534" onSelect={() => onApplyStyle?.({color: '#166534'}, 'green text')} />
+            <RibbonMenuItem label="Red text" swatch="#991b1b" onSelect={() => onApplyStyle?.({color: '#991b1b'}, 'red text')} />
+            <RibbonMenuItem label="Default text" swatch="transparent" onSelect={() => onApplyStyle?.({color: null}, 'default text')} />
+          </RibbonMenu>
         </RibbonGroup>
         <RibbonGroup label="Insert">
-          <RibbonButton label="Insert row above" icon={icon(Rows3)} onClick={onInsertRowAbove}>Row above</RibbonButton>
-          <RibbonButton label="Insert row below" icon={icon(Rows3)} onClick={onInsertRowBelow}>Row below</RibbonButton>
-          <RibbonButton label="Insert column left" icon={icon(UnfoldHorizontal)} onClick={onInsertColumnLeft}>Column left</RibbonButton>
-          <RibbonButton label="Insert column right" icon={icon(UnfoldHorizontal)} onClick={onInsertColumnRight}>Column right</RibbonButton>
+          <RibbonMenu label="Rows" icon={icon(Rows3)}>
+            <RibbonMenuItem label="Row above" icon={icon(Rows3)} onSelect={onInsertRowAbove} />
+            <RibbonMenuItem label="Row below" icon={icon(Rows3)} onSelect={onInsertRowBelow} />
+            <RibbonMenuItem label="Delete active row" icon={icon(Eraser)} onSelect={onDeleteActiveRow} />
+            <RibbonMenuItem label="Taller row" icon={icon(UnfoldVertical)} onSelect={onTallerActiveRow} />
+          </RibbonMenu>
+          <RibbonMenu label="Columns" icon={icon(UnfoldHorizontal)}>
+            <RibbonMenuItem label="Column left" icon={icon(UnfoldHorizontal)} onSelect={onInsertColumnLeft} />
+            <RibbonMenuItem label="Column right" icon={icon(UnfoldHorizontal)} onSelect={onInsertColumnRight} />
+            <RibbonMenuItem label="Delete active column" icon={icon(Eraser)} onSelect={onDeleteActiveColumn} />
+            <RibbonMenuItem label="Widen column" icon={icon(UnfoldHorizontal)} onSelect={onWidenActiveColumn} />
+          </RibbonMenu>
         </RibbonGroup>
         <RibbonGroup label="Data">
-          <RibbonButton label="Sort A-Z" icon={icon(ArrowDownAZ)} onClick={onSortAscending} />
-          <RibbonButton label="Sort Z-A" icon={icon(ArrowUpZA)} onClick={onSortDescending} />
-          <RibbonButton label="Filter" icon={icon(Filter)} onClick={onFilterSelection} />
-          <RibbonButton label="Clear filter" icon={icon(FilterX)} onClick={onClearFilter}>Clear filter</RibbonButton>
+          <RibbonMenu label="Sort" icon={icon(ArrowDownAZ)}>
+            <RibbonMenuItem label="Sort A-Z" icon={icon(ArrowDownAZ)} onSelect={onSortAscending} />
+            <RibbonMenuItem label="Sort Z-A" icon={icon(ArrowUpZA)} onSelect={onSortDescending} />
+          </RibbonMenu>
+          <RibbonMenu label="Filter" icon={icon(Filter)}>
+            <RibbonMenuItem label="Filter by active value" icon={icon(Filter)} onSelect={onFilterSelection} />
+            <RibbonMenuItem label="Clear filter" icon={icon(FilterX)} onSelect={onClearFilter} />
+          </RibbonMenu>
         </RibbonGroup>
         <RibbonGroup label="Cells">
-          <RibbonButton label="Merge" icon={icon(Combine)} onClick={onMergeSelection} />
-          <RibbonButton label="Unmerge" icon={icon(Split)} onClick={onUnmergeSelection} />
-          <RibbonButton label="Widen column" icon={icon(UnfoldHorizontal)} onClick={onWidenActiveColumn}>Widen</RibbonButton>
-          <RibbonButton label="Taller row" icon={icon(UnfoldVertical)} onClick={onTallerActiveRow}>Taller</RibbonButton>
+          <RibbonMenu label="Merge" icon={icon(Combine)}>
+            <RibbonMenuItem label="Merge selection" icon={icon(Combine)} onSelect={onMergeSelection} />
+            <RibbonMenuItem label="Unmerge active range" icon={icon(Split)} onSelect={onUnmergeSelection} />
+          </RibbonMenu>
+          <RibbonMenu label="Size" icon={icon(UnfoldHorizontal)}>
+            <RibbonMenuItem label="Widen column" icon={icon(UnfoldHorizontal)} onSelect={onWidenActiveColumn} />
+            <RibbonMenuItem label="Taller row" icon={icon(UnfoldVertical)} onSelect={onTallerActiveRow} />
+            <RibbonMenuItem label="Reset active size" icon={icon(BrushCleaning)} onSelect={onResetActiveSize} />
+          </RibbonMenu>
         </RibbonGroup>
         <RibbonGroup label="Rules">
-          <RibbonButton label="Number rule" icon={icon(ListChecks)} onClick={onValidateNumber}>Number rule</RibbonButton>
-          <RibbonButton label="List rule" icon={icon(Rows3)} onClick={onValidateList}>List rule</RibbonButton>
-          <RibbonButton label="Clear rule" icon={icon(ListX)} onClick={onClearValidation}>Clear rule</RibbonButton>
-          <RibbonButton label="Highlight greater than" icon={icon(Highlighter)} onClick={onHighlightGreaterThan}>Greater than</RibbonButton>
-          <RibbonButton label="Highlight text" icon={icon(Highlighter)} onClick={onHighlightTextContains}>Text contains</RibbonButton>
-          <RibbonButton label="Clear highlight" icon={icon(BrushCleaning)} onClick={onClearConditionalFormat}>Clear highlight</RibbonButton>
+          <RibbonMenu label="Validation" icon={icon(ListChecks)}>
+            <RibbonMenuItem label="Number rule" icon={icon(ListChecks)} onSelect={onValidateNumber} />
+            <RibbonMenuItem label="List rule" icon={icon(Rows3)} onSelect={onValidateList} />
+            <RibbonMenuItem label="Clear rule" icon={icon(ListX)} onSelect={onClearValidation} />
+          </RibbonMenu>
+          <RibbonMenu label="Highlight" icon={icon(Highlighter)}>
+            <RibbonMenuItem label="Greater than" icon={icon(Highlighter)} onSelect={onHighlightGreaterThan} />
+            <RibbonMenuItem label="Text contains" icon={icon(Highlighter)} onSelect={onHighlightTextContains} />
+            <RibbonMenuItem label="Clear highlight" icon={icon(BrushCleaning)} onSelect={onClearConditionalFormat} />
+          </RibbonMenu>
         </RibbonGroup>
         <RibbonGroup label="Names">
-          <RibbonButton label="Name" icon={icon(Tag)} onClick={onNameSelection} />
-          <RibbonButton label="Remove name" icon={icon(TagX)} onClick={onRemoveNamedRange}>Remove</RibbonButton>
+          <RibbonMenu label="Names" icon={icon(Tag)}>
+            <RibbonMenuItem label="Name selection" icon={icon(Tag)} onSelect={onNameSelection} />
+            <RibbonMenuItem label="Remove name" icon={icon(TagX)} onSelect={onRemoveNamedRange} />
+          </RibbonMenu>
         </RibbonGroup>
         <span className="toolbar-spacer" aria-hidden="true" />
         {showThemeControls ? (

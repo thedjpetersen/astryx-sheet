@@ -90,14 +90,17 @@ function toolbarProps(overrides = {}) {
     'onPasteClipboard',
     'onEditActiveCell',
     'onClearSelection',
+    'onClearFormatting',
     'onFormatNumber',
     'onFormatCurrency',
     'onFormatPercent',
     'onFormatDate',
+    'onApplyFormat',
     'onStyleBold',
     'onStyleBorder',
     'onStyleFill',
     'onStyleText',
+    'onApplyStyle',
     'onSortAscending',
     'onSortDescending',
     'onFilterSelection',
@@ -108,6 +111,8 @@ function toolbarProps(overrides = {}) {
     'onInsertRowBelow',
     'onInsertColumnLeft',
     'onInsertColumnRight',
+    'onDeleteActiveRow',
+    'onDeleteActiveColumn',
     'onValidateNumber',
     'onValidateList',
     'onClearValidation',
@@ -118,6 +123,9 @@ function toolbarProps(overrides = {}) {
     'onRemoveNamedRange',
     'onWidenActiveColumn',
     'onTallerActiveRow',
+    'onResetActiveSize',
+    'onFillDown',
+    'onFillRight',
     'onThemeNameChange',
     'onDarkModeChange',
     'onCompactRowsChange',
@@ -162,14 +170,17 @@ const toolbarCommandCallbacks = Object.freeze([
   'onPasteClipboard',
   'onEditActiveCell',
   'onClearSelection',
+  'onClearFormatting',
   'onFormatNumber',
   'onFormatCurrency',
   'onFormatPercent',
   'onFormatDate',
+  'onApplyFormat',
   'onStyleBold',
   'onStyleBorder',
   'onStyleFill',
   'onStyleText',
+  'onApplyStyle',
   'onSortAscending',
   'onSortDescending',
   'onFilterSelection',
@@ -180,6 +191,8 @@ const toolbarCommandCallbacks = Object.freeze([
   'onInsertRowBelow',
   'onInsertColumnLeft',
   'onInsertColumnRight',
+  'onDeleteActiveRow',
+  'onDeleteActiveColumn',
   'onValidateNumber',
   'onValidateList',
   'onClearValidation',
@@ -190,6 +203,9 @@ const toolbarCommandCallbacks = Object.freeze([
   'onRemoveNamedRange',
   'onWidenActiveColumn',
   'onTallerActiveRow',
+  'onResetActiveSize',
+  'onFillDown',
+  'onFillRight',
 ]);
 
 const contextMenuActions = Object.freeze([
@@ -216,61 +232,72 @@ const contextMenuActions = Object.freeze([
   'sample',
 ]);
 
-test('spreadsheet toolbar command buttons are wired to their callbacks', async () => {
+test('spreadsheet toolbar rich command controls are wired to their callbacks', async () => {
   const {SpreadsheetToolbar} = await loadUiModules();
   const {props, calls, handlers} = toolbarProps();
   const toolbar = SpreadsheetToolbar(props);
-  const buttons = collectElements(toolbar, (element) => element.type?.name === 'RibbonButton');
-  const byLabel = new Map(buttons.map((button) => [button.props.label, button]));
+  const menus = collectElements(toolbar, (element) => element.type?.name === 'RibbonMenu');
+  const menuLabels = menus.map((menu) => menu.props.label);
+  for (const label of ['Paste', 'Copy', 'Edit', 'Clear cells', 'Number', 'Currency', 'Percent', 'Date', 'Bold', 'Border', 'Fill', 'Text color', 'Rows', 'Columns', 'Sort', 'Filter', 'Merge', 'Size', 'Validation', 'Highlight', 'Names']) {
+    assert.ok(menuLabels.includes(label), `${label} rich control should render`);
+  }
+
+  const items = collectElements(toolbar, (element) => element.type?.name === 'RibbonMenuItem');
   const expected = new Map([
-    ['Paste', 'onPasteClipboard'],
-    ['Copy', 'onCopySelection'],
+    ['Paste from clipboard', 'onPasteClipboard'],
+    ['Copy selection', 'onCopySelection'],
     ['Undo', 'onUndo'],
     ['Redo', 'onRedo'],
-    ['Edit', 'onEditActiveCell'],
-    ['Clear', 'onClearSelection'],
-    ['Number', 'onFormatNumber'],
-    ['Currency', 'onFormatCurrency'],
-    ['Percent', 'onFormatPercent'],
-    ['Date', 'onFormatDate'],
+    ['Edit active cell', 'onEditActiveCell'],
+    ['Fill down', 'onFillDown'],
+    ['Fill right', 'onFillRight'],
+    ['Clear cell values', 'onClearSelection'],
+    ['Clear formatting', 'onClearFormatting'],
+    ['Number, 2 decimals', 'onFormatNumber'],
+    ['General', 'onApplyFormat'],
+    ['US dollar', 'onFormatCurrency'],
+    ['Euro', 'onApplyFormat'],
+    ['Percent, 1 decimal', 'onFormatPercent'],
+    ['Default date', 'onFormatDate'],
     ['Bold', 'onStyleBold'],
-    ['Border', 'onStyleBorder'],
-    ['Fill', 'onStyleFill'],
-    ['Text color', 'onStyleText'],
+    ['Normal weight', 'onApplyStyle'],
+    ['All borders', 'onStyleBorder'],
+    ['Light blue', 'onStyleFill'],
+    ['Blue text', 'onStyleText'],
+    ['Row above', 'onInsertRowAbove'],
+    ['Row below', 'onInsertRowBelow'],
+    ['Column left', 'onInsertColumnLeft'],
+    ['Column right', 'onInsertColumnRight'],
+    ['Delete active row', 'onDeleteActiveRow'],
+    ['Delete active column', 'onDeleteActiveColumn'],
     ['Sort A-Z', 'onSortAscending'],
     ['Sort Z-A', 'onSortDescending'],
-    ['Filter', 'onFilterSelection'],
+    ['Filter by active value', 'onFilterSelection'],
     ['Clear filter', 'onClearFilter'],
-    ['Merge', 'onMergeSelection'],
-    ['Unmerge', 'onUnmergeSelection'],
-    ['Insert row above', 'onInsertRowAbove'],
-    ['Insert row below', 'onInsertRowBelow'],
-    ['Insert column left', 'onInsertColumnLeft'],
-    ['Insert column right', 'onInsertColumnRight'],
-    ['Widen column', 'onWidenActiveColumn'],
-    ['Taller row', 'onTallerActiveRow'],
+    ['Merge selection', 'onMergeSelection'],
+    ['Unmerge active range', 'onUnmergeSelection'],
+    ['Reset active size', 'onResetActiveSize'],
     ['Number rule', 'onValidateNumber'],
     ['List rule', 'onValidateList'],
     ['Clear rule', 'onClearValidation'],
-    ['Highlight greater than', 'onHighlightGreaterThan'],
-    ['Highlight text', 'onHighlightTextContains'],
+    ['Greater than', 'onHighlightGreaterThan'],
+    ['Text contains', 'onHighlightTextContains'],
     ['Clear highlight', 'onClearConditionalFormat'],
-    ['Name', 'onNameSelection'],
+    ['Name selection', 'onNameSelection'],
     ['Remove name', 'onRemoveNamedRange'],
   ]);
 
-  assert.equal(buttons.length, expected.size);
   for (const [label, handlerName] of expected) {
-    const button = byLabel.get(label);
-    assert.ok(button, `${label} button should render`);
-    assert.equal(button.props.onClick, handlers[handlerName], `${label} should use ${handlerName}`);
-    const hostButton = button.type(button.props);
+    const item = items.find((candidate) => candidate.props.label === label);
+    assert.ok(item, `${label} menu item should render`);
+    const hostButton = item.type(item.props);
     assert.equal(hostButton.type, 'button');
-    assert.equal(hostButton.props['aria-label'], label);
-    assert.equal(hostButton.props.onClick, handlers[handlerName]);
-    hostButton.props.onClick();
+    assert.equal(hostButton.props.role, 'menuitem');
+    hostButton.props.onClick({currentTarget: {closest: () => ({removeAttribute: () => {}})}});
+    assert.equal(calls.at(-1).name, handlerName, `${label} should call ${handlerName}`);
   }
-  assert.deepEqual(calls.map((call) => call.name), [...expected.values()]);
+  assert.deepEqual(handlers.onApplyFormat, props.onApplyFormat);
+  assert.deepEqual(handlers.onApplyStyle, props.onApplyStyle);
 });
 
 test('top-level spreadsheet shell renders toolbar, formula bar, grid, and sheet tabs together', async () => {
@@ -342,9 +369,9 @@ test('spreadsheet toolbar forwards formula editor and view controls', async () =
   assert.equal(formulaEditor.props.onFormulaFocusChange, handlers.onFormulaFocusChange);
   assert.equal(formulaEditor.props.onFormulaCursorChange, handlers.onFormulaCursorChange);
 
-  const ribbonButtons = collectElements(toolbar, (element) => element.type?.name === 'RibbonButton');
-  const undo = ribbonButtons.find((button) => button.props.label === 'Undo');
-  const redo = ribbonButtons.find((button) => button.props.label === 'Redo');
+  const menuItems = collectElements(toolbar, (element) => element.type?.name === 'RibbonMenuItem');
+  const undo = menuItems.find((item) => item.props.label === 'Undo');
+  const redo = menuItems.find((item) => item.props.label === 'Redo');
   assert.equal(undo.type(undo.props).props.disabled, true);
   assert.equal(redo.type(redo.props).props.disabled, true);
 

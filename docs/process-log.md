@@ -145,6 +145,7 @@
 - Fixed mounted UI wiring gaps found during browser smoke testing: context-menu item clicks now reach spreadsheet actions, removing the active sheet recalculates against the surviving sheet, and formula-bar styles avoid React shorthand/longhand conflicts.
 - Wired row and column headers as selectable controls, including header-drag ranges and context-menu entry points, and fixed toolbar range actions so formatting, styling, and sorting preserve generated default cell values instead of materializing blanks.
 - Added Shift-click row and column header range selection, converted ribbon tabs into clickable controls, and exposed active-row/column insert commands through the Insert ribbon group.
+- Reworked the spreadsheet ribbon commands into rich popover controls with grouped options for clipboard, editing, clearing, number formats, currencies, percentages, dates, style palettes, rows, columns, sorting, filters, merges, sizing, validation, highlighting, and named ranges.
 
 ## Current Direction
 

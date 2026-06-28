@@ -591,12 +591,13 @@ export function Spreadsheet({
     }
     return Object.keys(defaultCells).length ? defaultCells : undefined;
   }, [getDefaultCellValue]);
-  const formatSelection = useCallback((format, label) => {
+  const formatSelection = useCallback((format, label, replace = false) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     const command = {
       type: CommandType.SET_RANGE_FORMAT,
       range: selection,
       format,
+      replace,
       defaultCells: getDefaultCellsForSelection(selection),
       label: `Format ${label}`,
     };
@@ -606,12 +607,13 @@ export function Spreadsheet({
     setDataVersion((v) => v + 1);
     showToast(`Formatted ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)} as ${label}`);
   }, [activeCell, committedSelection, dispatchWorkbookCommand, getDefaultCellsForSelection, onCellChange, showToast]);
-  const styleSelection = useCallback((style, label) => {
+  const styleSelection = useCallback((style, label, replace = false) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     const command = {
       type: CommandType.SET_RANGE_STYLE,
       range: selection,
       style,
+      replace,
       defaultCells: getDefaultCellsForSelection(selection),
       label: `Style ${label}`,
     };
@@ -620,6 +622,23 @@ export function Spreadsheet({
     onCellChange?.({selection, style, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
     setDataVersion((v) => v + 1);
     showToast(`Styled ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)} as ${label}`);
+  }, [activeCell, committedSelection, dispatchWorkbookCommand, getDefaultCellsForSelection, onCellChange, showToast]);
+  const clearSelectionFormatting = useCallback(() => {
+    const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    const defaultCells = getDefaultCellsForSelection(selection);
+    const command = {
+      type: CommandType.BATCH,
+      commands: [
+        {type: CommandType.SET_RANGE_FORMAT, range: selection, format: undefined, replace: true, defaultCells},
+        {type: CommandType.SET_RANGE_STYLE, range: selection, style: undefined, replace: true, defaultCells},
+      ],
+      label: 'Clear formatting',
+    };
+    const result = dispatchWorkbookCommand(command, {}, {source: 'format'});
+    const nextWorkbook = result.workbook;
+    onCellChange?.({selection, format: null, style: null, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
+    setDataVersion((v) => v + 1);
+    showToast(`Cleared formatting in ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`);
   }, [activeCell, committedSelection, dispatchWorkbookCommand, getDefaultCellsForSelection, onCellChange, showToast]);
   const sortSelection = useCallback((direction) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
@@ -1367,14 +1386,17 @@ export function Spreadsheet({
           onPasteClipboard={pasteClipboardAtActiveCell}
           onEditActiveCell={() => openEditor(activeCell.row, activeCell.col)}
           onClearSelection={clearSelection}
+          onClearFormatting={clearSelectionFormatting}
           onFormatNumber={() => formatSelection({type: NumberFormatType.NUMBER, decimals: 2}, 'number')}
           onFormatCurrency={() => formatSelection({type: NumberFormatType.CURRENCY, currency: 'USD', decimals: 2}, 'currency')}
           onFormatPercent={() => formatSelection({type: NumberFormatType.PERCENT, decimals: 1}, 'percent')}
           onFormatDate={() => formatSelection({type: NumberFormatType.DATE}, 'date')}
+          onApplyFormat={(format, label, replace) => formatSelection(format, label, replace)}
           onStyleBold={() => styleSelection({fontWeight: 700}, 'bold')}
           onStyleBorder={() => styleSelection({border: '1px solid #64748b'}, 'border')}
           onStyleFill={() => styleSelection({backgroundColor: '#e0f2fe'}, 'fill')}
           onStyleText={() => styleSelection({color: '#075985'}, 'text color')}
+          onApplyStyle={(style, label, replace) => styleSelection(style, label, replace)}
           onSortAscending={() => sortSelection('asc')}
           onSortDescending={() => sortSelection('desc')}
           onFilterSelection={filterSelectionByActiveValue}
@@ -1385,6 +1407,8 @@ export function Spreadsheet({
           onInsertRowBelow={() => insertRowAt(activeCell.row, 'below')}
           onInsertColumnLeft={() => insertColumnAt(activeCell.col, 'left')}
           onInsertColumnRight={() => insertColumnAt(activeCell.col, 'right')}
+          onDeleteActiveRow={() => deleteRowAt(activeCell.row)}
+          onDeleteActiveColumn={() => deleteColumnAt(activeCell.col)}
           onValidateNumber={applyNumberValidation}
           onValidateList={applyListValidation}
           onClearValidation={clearValidation}
@@ -1395,6 +1419,9 @@ export function Spreadsheet({
           onRemoveNamedRange={removeNamedRange}
           onWidenActiveColumn={() => resizeColumn(activeCell.col, colMetrics.size(activeCell.col) + 20)}
           onTallerActiveRow={() => resizeRow(activeCell.row, rowMetrics.size(activeCell.row) + 6)}
+          onResetActiveSize={() => resetCellDimensions(activeCell.row, activeCell.col)}
+          onFillDown={fillSelectionDown}
+          onFillRight={fillSelectionRight}
           themeName={themeName}
           onThemeNameChange={setThemeName}
           darkMode={darkMode}
