@@ -11,7 +11,7 @@ export {spreadsheetMLToWorkbook, workbookToSpreadsheetML} from './spreadsheetml.
 export {commandRequiresFullRecalculation, dispatchCommandWithRecalculation, evaluateCellForCache, getCachedCellDisplayValue, previewFormulaDraft, recalculateSheet, recalculateWorkbook} from './calculation.js';
 export {buildDependencyGraph, buildWorkbookDependencyGraph, collectDependentCells, extractFormulaReferences, getFormulaRecalculationOrder, getWorkbookFormulaRecalculationOrder, parseWorkbookCellKey, workbookCellKey} from './dependencies.js';
 export {cloneFilter, createFilter, createFilterStore, getVisibleRowsForFilter, getVisibleRowsForSheet, matchesFilterCriterion} from './filters.js';
-export {NumberFormatType, formatValue, mergeCellFormat, mergeCellStyle} from './formatting.js';
+export {NumberFormatType, cloneRangeFormatRule, cloneRangeStyleRule, formatValue, getEffectiveCellFormat, getEffectiveCellStyle, getRangeFormatForCell, getRangeStyleForCell, mergeCellFormat, mergeCellStyle, rangeContainsCell} from './formatting.js';
 export {assertNoMergeOverlap, cloneMergedRange, createMergeStore, createMergedRange, getMergeAtCell, listMergedRanges, mergeIdForRange, rangesIntersect} from './merges.js';
 export {cloneNamedRange, createNamedRange, createNamedRangeStore, expandNamedRangesInFormula, getNamedRange, listNamedRanges, normalizeName, rangeToFormulaReference} from './names.js';
 export {cloneValidationRule, createValidationRule, createValidationStore, getValidationRulesForCell, validateCellValue, validateValue, validationAppliesToCell, validationIdForRange} from './validation.js';
@@ -19,6 +19,8 @@ export {deserializeWorkbook, serializeWorkbook} from './serialization.js';
 export {
   createCellStore,
   createDimensionStore,
+  createRangeFormatStore,
+  createRangeStyleStore,
   createSheet,
   createSheetDataRef,
   createSheetId,

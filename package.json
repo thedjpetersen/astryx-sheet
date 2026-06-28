@@ -19,7 +19,8 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test"
+    "test": "node --test",
+    "profile:bulk": "node --cpu-prof --cpu-prof-dir=/tmp --cpu-prof-name=astryx-bulk-actions.cpuprofile scripts/profile-bulk-actions.mjs"
   },
   "keywords": [
     "astryx",

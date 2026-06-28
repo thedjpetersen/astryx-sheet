@@ -73,3 +73,79 @@ export function mergeCellStyle(currentStyle, nextStyle) {
   }
   return Object.keys(merged).length ? merged : undefined;
 }
+
+function clonePlainRecord(record) {
+  return record && typeof record === 'object' ? {...record} : record;
+}
+
+function cloneRange(range) {
+  return range ? {r1: range.r1, c1: range.c1, r2: range.r2, c2: range.c2} : null;
+}
+
+function rangeRulesFromStore(store) {
+  if (!store) return [];
+  if (store instanceof Map) return Array.from(store.values());
+  if (Array.isArray(store)) return store;
+  if (typeof store === 'object') return Object.values(store);
+  return [];
+}
+
+export function cloneRangeStyleRule(rule = {}) {
+  const range = cloneRange(rule.range);
+  return {
+    ...rule,
+    range,
+    style: clonePlainRecord(rule.style),
+    replace: Boolean(rule.replace),
+  };
+}
+
+export function cloneRangeFormatRule(rule = {}) {
+  const range = cloneRange(rule.range);
+  return {
+    ...rule,
+    range,
+    format: clonePlainRecord(rule.format),
+    replace: Boolean(rule.replace),
+  };
+}
+
+export function rangeContainsCell(range, row, col) {
+  return Boolean(range)
+    && row >= range.r1
+    && row <= range.r2
+    && col >= range.c1
+    && col <= range.c2;
+}
+
+export function getRangeStyleForCell(sheet, row, col) {
+  let style;
+  for (const rule of rangeRulesFromStore(sheet?.rangeStyles)) {
+    if (!rangeContainsCell(rule.range, row, col)) continue;
+    style = rule.replace
+      ? mergeCellStyle(undefined, rule.style)
+      : mergeCellStyle(style, rule.style);
+  }
+  return style;
+}
+
+export function getRangeFormatForCell(sheet, row, col) {
+  let format;
+  for (const rule of rangeRulesFromStore(sheet?.rangeFormats)) {
+    if (!rangeContainsCell(rule.range, row, col)) continue;
+    format = rule.replace
+      ? mergeCellFormat(undefined, rule.format)
+      : mergeCellFormat(format, rule.format);
+  }
+  return format;
+}
+
+export function getEffectiveCellStyle(sheet, row, col, cellStyle) {
+  const rangeStyle = getRangeStyleForCell(sheet, row, col);
+  return cellStyle == null ? rangeStyle : mergeCellStyle(rangeStyle, cellStyle);
+}
+
+export function getEffectiveCellFormat(sheet, row, col, cellFormat) {
+  const rangeFormat = getRangeFormatForCell(sheet, row, col);
+  return cellFormat == null ? rangeFormat : mergeCellFormat(rangeFormat, cellFormat);
+}

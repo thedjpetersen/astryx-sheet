@@ -5,7 +5,7 @@ import {evaluateFormula, formatFormulaResult, formulaArrayCellValue, formulaArra
 import {cellRecordToRaw, cellRecordToSerializable, cloneCellRecord, normalizeCellRecord} from './cells.js';
 import {cloneConditionalFormat, createConditionalFormatStore} from './conditionalFormatting.js';
 import {cloneFilter, createFilterStore} from './filters.js';
-import {formatValue} from './formatting.js';
+import {cloneRangeFormatRule, cloneRangeStyleRule, formatValue, getEffectiveCellFormat} from './formatting.js';
 import {cloneMergedRange, createMergeStore} from './merges.js';
 import {cloneNamedRange, createNamedRangeStore, expandNamedRangesInFormula} from './names.js';
 import {cloneValidationRule, createValidationStore} from './validation.js';
@@ -40,6 +40,26 @@ export function createDimensionStore(initialDimensions) {
   return new Map(entriesFromMapLike(initialDimensions).map(([key, value]) => [Number(key), Number(value)]).filter(([, value]) => Number.isFinite(value)));
 }
 
+function createRangeRuleStore(initialRules, cloneRule, prefix) {
+  const entries = Array.isArray(initialRules)
+    ? initialRules.map((item, index) => (Array.isArray(item) ? item : [index, item]))
+    : entriesFromMapLike(initialRules);
+  return new Map(entries.flatMap(([key, rule]) => {
+    const cloned = cloneRule(rule);
+    if (!cloned?.range) return [];
+    const id = cloned.id || `${prefix}-${key}`;
+    return [[id, {...cloned, id}]];
+  }));
+}
+
+export function createRangeStyleStore(initialRules) {
+  return createRangeRuleStore(initialRules, cloneRangeStyleRule, 'range-style');
+}
+
+export function createRangeFormatStore(initialRules) {
+  return createRangeRuleStore(initialRules, cloneRangeFormatRule, 'range-format');
+}
+
 export function createSheet(input = {}) {
   const id = input.id || createSheetId();
   return {
@@ -56,6 +76,8 @@ export function createSheet(input = {}) {
     merges: createMergeStore(input.merges),
     validations: createValidationStore(input.validations),
     conditionalFormats: createConditionalFormatStore(input.conditionalFormats),
+    rangeStyles: createRangeStyleStore(input.rangeStyles),
+    rangeFormats: createRangeFormatStore(input.rangeFormats),
     metadata: input.metadata ? {...input.metadata} : {},
   };
 }
@@ -70,6 +92,8 @@ export function cloneSheet(sheet) {
     merges: new Map(Array.from(sheet.merges.entries(), ([id, merge]) => [id, cloneMergedRange(merge)])),
     validations: new Map(Array.from(sheet.validations.entries(), ([id, rule]) => [id, cloneValidationRule(rule)])),
     conditionalFormats: new Map(Array.from(sheet.conditionalFormats.entries(), ([id, rule]) => [id, cloneConditionalFormat(rule)])),
+    rangeStyles: new Map(Array.from((sheet.rangeStyles || new Map()).entries(), ([id, rule]) => [id, cloneRangeStyleRule(rule)])),
+    rangeFormats: new Map(Array.from((sheet.rangeFormats || new Map()).entries(), ([id, rule]) => [id, cloneRangeFormatRule(rule)])),
     metadata: {...sheet.metadata},
   };
 }
@@ -259,7 +283,7 @@ export function getCellDisplayValue(workbook, sheetId, row, col, options = {}) {
   const record = getCellRecord(workbook, sheetId, row, col);
   const getDefaultCellValue = options.getDefaultCellValue || defaultCellValue;
   const raw = getCellRawValue(workbook, sheetId, row, col, {getDefaultCellValue});
-  const format = record?.format;
+  const format = getEffectiveCellFormat(sheet, row, col, record?.format);
   if (record?.formula && 'computedValue' in record) {
     if (isFormulaArrayValue(record.computedValue) && isSpillBlocked(sheet, row, col, record.computedValue)) return '#SPILL!';
     return format ? formatValue(record.computedValue, format, options) : record.displayValue ?? formatFormulaResult(record.computedValue);
@@ -296,6 +320,8 @@ export function serializeSheetForSnapshot(sheet) {
     merges: Array.from(sheet.merges.values()).map(cloneMergedRange),
     validations: Array.from(sheet.validations.values()).map(cloneValidationRule),
     conditionalFormats: Array.from(sheet.conditionalFormats.values()).map(cloneConditionalFormat),
+    rangeStyles: Array.from((sheet.rangeStyles || new Map()).values()).map(cloneRangeStyleRule),
+    rangeFormats: Array.from((sheet.rangeFormats || new Map()).values()).map(cloneRangeFormatRule),
     metadata: {...sheet.metadata},
   };
 }

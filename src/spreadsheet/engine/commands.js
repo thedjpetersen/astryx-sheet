@@ -3,7 +3,7 @@ import {normalizeSelection} from '../model/selection.js';
 import {cloneCellRecord, normalizeCellRecord} from './cells.js';
 import {cloneConditionalFormat, createConditionalFormat} from './conditionalFormatting.js';
 import {cloneFilter, createFilter} from './filters.js';
-import {mergeCellFormat, mergeCellStyle} from './formatting.js';
+import {cloneRangeFormatRule, cloneRangeStyleRule, mergeCellFormat, mergeCellStyle, rangeContainsCell} from './formatting.js';
 import {assertNoMergeOverlap, cloneMergedRange, createMergedRange, mergeIdForRange} from './merges.js';
 import {cloneNamedRange, createNamedRange, normalizeName} from './names.js';
 import {cloneValidationRule, createValidationRule, validationIdForRange} from './validation.js';
@@ -45,6 +45,9 @@ export const CommandType = {
   REMOVE_NAMED_RANGE: 'REMOVE_NAMED_RANGE',
 };
 
+const SPARSE_RANGE_CELL_LIMIT = 50000;
+const SORT_RANGE_CELL_LIMIT = 50000;
+
 function normalizeCommandCell(command) {
   if ('cell' in command) return normalizeCellRecord(command.cell);
   if ('formula' in command) return normalizeCellRecord({formula: command.formula, value: command.value});
@@ -60,6 +63,21 @@ function* iterateRange(range) {
       yield {row, col};
     }
   }
+}
+
+function rangeCellCount(range) {
+  if (!range) return 0;
+  const rows = Math.max(0, range.r2 - range.r1 + 1);
+  const cols = Math.max(0, range.c2 - range.c1 + 1);
+  return rows * cols;
+}
+
+function sortRangeCellCount(command) {
+  const range = command.range;
+  if (!range) return 0;
+  const startRow = command.hasHeader ? range.r1 + 1 : range.r1;
+  if (startRow > range.r2) return 0;
+  return (range.r2 - startRow + 1) * Math.max(0, range.c2 - range.c1 + 1);
 }
 
 export function getChangedCellKeysForCommand(command) {
@@ -89,10 +107,16 @@ export function getChangedCellKeysForCommand(command) {
     for (const point of iterateRange(command.range)) keys.add(cellKey(point.row, point.col));
   }
   if (command.type === CommandType.SET_RANGE_FORMAT || command.type === CommandType.SET_RANGE_STYLE) {
+    if (command.sparse || rangeCellCount(command.range) > SPARSE_RANGE_CELL_LIMIT) return keys;
     for (const point of iterateRange(command.range)) keys.add(cellKey(point.row, point.col));
     return keys;
   }
   if (command.type === CommandType.SORT_RANGE) {
+    if (sortRangeCellCount(command) > SORT_RANGE_CELL_LIMIT) {
+      const startRow = command.hasHeader ? command.range.r1 + 1 : command.range.r1;
+      keys.add(cellKey(startRow, command.range.c1));
+      return keys;
+    }
     const startRow = command.hasHeader ? command.range.r1 + 1 : command.range.r1;
     for (let row = startRow; row <= command.range.r2; row++) {
       for (let col = command.range.c1; col <= command.range.c2; col++) keys.add(cellKey(row, col));
@@ -208,7 +232,68 @@ function getCommandDefaultCell(command, key) {
   return normalizeCellRecord(command.defaultCells[key]);
 }
 
+function parseCellKey(key) {
+  const [row, col] = String(key).split(':').map(Number);
+  return {row, col};
+}
+
+function nextRangeRuleId(store, prefix, range) {
+  const base = `${prefix}:${range.r1}:${range.c1}:${range.r2}:${range.c2}`;
+  if (!store.has(base)) return base;
+  let suffix = 2;
+  while (store.has(`${base}:${suffix}`)) suffix += 1;
+  return `${base}:${suffix}`;
+}
+
+function cloneRangeForCommand(range) {
+  return {r1: range.r1, c1: range.c1, r2: range.r2, c2: range.c2};
+}
+
+function cloneCommandPayload(payload) {
+  return payload && typeof payload === 'object' ? {...payload} : payload;
+}
+
+function updateExistingCellsInRange(sheet, range, applyCell) {
+  for (const [key, cell] of Array.from(sheet.cells.entries())) {
+    const point = parseCellKey(key);
+    if (!rangeContainsCell(range, point.row, point.col)) continue;
+    const nextCell = cloneCellRecord(cell) || {};
+    applyCell(nextCell);
+    setCellRecord(sheet, point.row, point.col, Object.keys(nextCell).length ? nextCell : null);
+  }
+}
+
+function applySparseRangeFormat(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const oldSheet = cloneSheet(getSheet(workbook, sheetId));
+  let committedCommand = command;
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
+    const id = command.id || nextRangeRuleId(sheet.rangeFormats, 'range-format', command.range);
+    committedCommand = {...command, id};
+    sheet.rangeFormats.set(id, cloneRangeFormatRule({
+      id,
+      range: cloneRangeForCommand(command.range),
+      format: cloneCommandPayload(command.format),
+      replace: Boolean(command.replace),
+    }));
+    updateExistingCellsInRange(sheet, command.range, (nextCell) => {
+      nextCell.format = command.replace
+        ? cloneCommandPayload(command.format)
+        : mergeCellFormat(nextCell.format, command.format);
+      if (!nextCell.format) delete nextCell.format;
+    });
+  });
+  return {
+    workbook: nextWorkbook,
+    command: committedCommand,
+    inverse: {type: CommandType.RESTORE_SHEET, sheetId, sheet: oldSheet},
+  };
+}
+
 function applySetRangeFormat(workbook, command) {
+  if (command.sparse || rangeCellCount(command.range) > SPARSE_RANGE_CELL_LIMIT) {
+    return applySparseRangeFormat(workbook, command);
+  }
   const sheetId = command.sheetId || workbook.activeSheetId;
   const oldCells = [];
   const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
@@ -230,7 +315,37 @@ function applySetRangeFormat(workbook, command) {
   };
 }
 
+function applySparseRangeStyle(workbook, command) {
+  const sheetId = command.sheetId || workbook.activeSheetId;
+  const oldSheet = cloneSheet(getSheet(workbook, sheetId));
+  let committedCommand = command;
+  const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
+    const id = command.id || nextRangeRuleId(sheet.rangeStyles, 'range-style', command.range);
+    committedCommand = {...command, id};
+    sheet.rangeStyles.set(id, cloneRangeStyleRule({
+      id,
+      range: cloneRangeForCommand(command.range),
+      style: cloneCommandPayload(command.style),
+      replace: Boolean(command.replace),
+    }));
+    updateExistingCellsInRange(sheet, command.range, (nextCell) => {
+      nextCell.style = command.replace
+        ? mergeCellStyle(undefined, command.style)
+        : mergeCellStyle(nextCell.style, command.style);
+      if (!nextCell.style) delete nextCell.style;
+    });
+  });
+  return {
+    workbook: nextWorkbook,
+    command: committedCommand,
+    inverse: {type: CommandType.RESTORE_SHEET, sheetId, sheet: oldSheet},
+  };
+}
+
 function applySetRangeStyle(workbook, command) {
+  if (command.sparse || rangeCellCount(command.range) > SPARSE_RANGE_CELL_LIMIT) {
+    return applySparseRangeStyle(workbook, command);
+  }
   const sheetId = command.sheetId || workbook.activeSheetId;
   const oldCells = [];
   const nextWorkbook = withClonedSheet(workbook, sheetId, (sheet) => {
@@ -279,6 +394,10 @@ function applySortRange(workbook, command) {
   const sheetId = command.sheetId || workbook.activeSheetId;
   const range = command.range;
   const startRow = command.hasHeader ? range.r1 + 1 : range.r1;
+  const sortCellCount = sortRangeCellCount(command);
+  if (sortCellCount > (command.maxCells || SORT_RANGE_CELL_LIMIT)) {
+    throw new Error(`Sort range too large (${sortCellCount.toLocaleString()} cells); select a bounded table range`);
+  }
   const sortBy = command.sortBy?.length ? command.sortBy : [{col: range.c1, direction: 'asc'}];
   const oldCells = [];
 
@@ -542,6 +661,16 @@ function shiftSheetMetadataForStructure(sheet, kind, index, count, mode) {
     const range = adjustRangeForStructure(filter.range, kind, index, count, mode);
     if (!range) return [];
     return [[id, {...cloneFilter(filter), range}]];
+  }));
+  sheet.rangeStyles = new Map(Array.from((sheet.rangeStyles || new Map()).entries()).flatMap(([id, rule]) => {
+    const range = adjustRangeForStructure(rule.range, kind, index, count, mode);
+    if (!range) return [];
+    return [[id, {...cloneRangeStyleRule(rule), range}]];
+  }));
+  sheet.rangeFormats = new Map(Array.from((sheet.rangeFormats || new Map()).entries()).flatMap(([id, rule]) => {
+    const range = adjustRangeForStructure(rule.range, kind, index, count, mode);
+    if (!range) return [];
+    return [[id, {...cloneRangeFormatRule(rule), range}]];
   }));
 }
 

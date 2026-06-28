@@ -34,6 +34,7 @@ import {
   getCellRecord,
   getConditionalFormatRulesForCell,
   getConditionalFormatStyle,
+  getEffectiveCellStyle,
   getMergeAtCell,
   getVisibleRowsForSheet,
   getNamedRange,
@@ -3047,6 +3048,96 @@ test('range format and style commands preserve supplied default cell values', ()
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 1), '1280');
   assert.equal(getCellDisplayValue(workbook, 'sheet-1', 1, 1), '$1,280.00');
   assert.deepEqual(getCellRecord(workbook, 'sheet-1', 1, 1).format, {type: 'currency', currency: 'USD', decimals: 2});
+});
+
+test('sparse range style commands cover large header selections without materializing cells', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1', rowCount: 100000, colCount: 2000}]});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_RANGE_STYLE,
+    range: {r1: 0, c1: 2, r2: 99999, c2: 4},
+    style: {backgroundColor: '#ff00aa'},
+    sparse: true,
+  });
+
+  let sheet = workbook.sheets.get('sheet-1');
+  assert.equal(sheet.cells.size, 0);
+  assert.equal(sheet.rangeStyles.size, 1);
+  assert.deepEqual(getEffectiveCellStyle(sheet, 10, 3), {backgroundColor: '#ff00aa'});
+  assert.equal(getEffectiveCellStyle(sheet, 10, 5), undefined);
+
+  const restored = deserializeWorkbook(serializeWorkbook(workbook));
+  sheet = restored.sheets.get('sheet-1');
+  assert.equal(sheet.cells.size, 0);
+  assert.equal(sheet.rangeStyles.size, 1);
+  assert.deepEqual(getEffectiveCellStyle(sheet, 99999, 4), {backgroundColor: '#ff00aa'});
+
+  workbook = undo(workbook);
+  sheet = workbook.sheets.get('sheet-1');
+  assert.equal(sheet.cells.size, 0);
+  assert.equal(sheet.rangeStyles.size, 0);
+});
+
+test('sparse range style commands update existing cells while keeping empty cells sparse', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1', rowCount: 100000, colCount: 2000}]});
+  workbook = dispatchCommand(workbook, {type: CommandType.SET_CELL, row: 1, col: 2, value: 'Explicit'});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_RANGE_STYLE,
+    range: {r1: 1, c1: 2, r2: 1, c2: 2},
+    style: {backgroundColor: '#fecaca'},
+  });
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_RANGE_STYLE,
+    range: {r1: 0, c1: 2, r2: 99999, c2: 2},
+    style: {backgroundColor: '#dcfce7'},
+    sparse: true,
+  });
+
+  const sheet = workbook.sheets.get('sheet-1');
+  assert.equal(sheet.cells.size, 1);
+  assert.equal(getCellRecord(workbook, 'sheet-1', 1, 2).style.backgroundColor, '#dcfce7');
+  assert.deepEqual(getEffectiveCellStyle(sheet, 4096, 2), {backgroundColor: '#dcfce7'});
+});
+
+test('sparse range format commands display large default-backed selections without materializing cells', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1', rowCount: 100000, colCount: 2000}]});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_RANGE_FORMAT,
+    range: {r1: 0, c1: 2, r2: 99999, c2: 2},
+    format: {type: NumberFormatType.CURRENCY, currency: 'USD', decimals: 2},
+    sparse: true,
+  });
+
+  const getDefaultCellValue = (row, col) => (col === 2 ? '1280' : '');
+  const sheet = workbook.sheets.get('sheet-1');
+  assert.equal(sheet.cells.size, 0);
+  assert.equal(sheet.rangeFormats.size, 1);
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 4096, 2, {getDefaultCellValue}), '$1,280.00');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 4096, 3, {getDefaultCellValue}), '');
+});
+
+test('bulk range change tracking and sorting avoid full header-sized enumeration', () => {
+  const styleKeys = getChangedCellKeysForCommand({
+    type: CommandType.SET_RANGE_STYLE,
+    range: {r1: 0, c1: 2, r2: 99999, c2: 4},
+    style: {backgroundColor: '#ff00aa'},
+  });
+  assert.equal(styleKeys.size, 0);
+
+  const sortKeys = getChangedCellKeysForCommand({
+    type: CommandType.SORT_RANGE,
+    range: {r1: 0, c1: 0, r2: 99999, c2: 4},
+    hasHeader: true,
+    sortBy: [{col: 0, direction: 'asc'}],
+  });
+  assert.equal(sortKeys.size, 1);
+
+  const workbook = createWorkbook({sheets: [{id: 'sheet-1', rowCount: 100000, colCount: 2000}]});
+  assert.throws(() => dispatchCommand(workbook, {
+    type: CommandType.SORT_RANGE,
+    range: {r1: 0, c1: 0, r2: 99999, c2: 4},
+    hasHeader: true,
+    sortBy: [{col: 0, direction: 'asc'}],
+  }), /Sort range too large/);
 });
 
 test('sort range command orders rows and restores with undo', () => {

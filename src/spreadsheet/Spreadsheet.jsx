@@ -11,7 +11,7 @@ import {NativeContextMenu} from './components/NativeContextMenu.jsx';
 import {RowFragment} from './components/RowFragment.jsx';
 import {SheetTabs} from './components/SheetTabs.jsx';
 import {SpreadsheetToolbar} from './components/SpreadsheetToolbar.jsx';
-import {CommandType, ConditionalFormatType, NumberFormatType, createFillDownCommand, createFillRightCommand, createImportHtmlTableCommand, createPasteTsvCommand, createSheetDataRef, createWorkbookController, getActiveSheet, getCellRawValue, getCellRecord, getCellSpillRange, getConditionalFormatRulesForCell, getMergeAtCell, getValidationRulesForCell, getVisibleRowsForSheet, listNamedRanges, normalizeName, previewFormulaDraft, rangeToHtmlTable, rangeToTsv, validateCellValue} from './engine/index.js';
+import {CommandType, ConditionalFormatType, NumberFormatType, createFillDownCommand, createFillRightCommand, createImportHtmlTableCommand, createPasteTsvCommand, createSheetDataRef, createWorkbookController, getActiveSheet, getCellRawValue, getCellRecord, getCellSpillRange, getConditionalFormatRulesForCell, getEffectiveCellStyle, getMergeAtCell, getValidationRulesForCell, getVisibleRowsForSheet, listNamedRanges, normalizeName, previewFormulaDraft, rangeToHtmlTable, rangeToTsv, validateCellValue} from './engine/index.js';
 import {cellAddress, cellKey, columnName} from './model/address.js';
 import {DEFAULT_GRID_CONFIG} from './model/constants.js';
 import {createDefaultCellData, createDefaultColWidths, createDefaultRowHeights, defaultCellValue} from './model/defaultData.js';
@@ -21,6 +21,8 @@ import {normalizeSelection} from './model/selection.js';
 
 const DEFAULT_TITLE = 'Astryx Sheet';
 const DEFAULT_SUBTITLE = 'Agent-ready virtual spreadsheet artifact';
+const BULK_RANGE_CELL_LIMIT = 50000;
+const BULK_SORT_CELL_LIMIT = 50000;
 
 function clampPoint(point, gridConfig) {
   return {
@@ -109,10 +111,26 @@ function defaultRangeName(selection) {
   return `Range_${cellAddress(selection.r1, selection.c1)}_${cellAddress(selection.r2, selection.c2)}`.replace(/[^A-Za-z0-9_]/g, '_');
 }
 
+function selectionCellCount(selection) {
+  const rows = Math.max(0, selection.r2 - selection.r1 + 1);
+  const cols = Math.max(0, selection.c2 - selection.c1 + 1);
+  return rows * cols;
+}
+
+function sortableCellCount(selection) {
+  const startRow = selection.r1 === 0 ? selection.r1 + 1 : selection.r1;
+  if (startRow > selection.r2) return 0;
+  return (selection.r2 - startRow + 1) * Math.max(0, selection.c2 - selection.c1 + 1);
+}
+
+function shouldUseSparseRange(selection) {
+  return selectionCellCount(selection) > BULK_RANGE_CELL_LIMIT;
+}
+
 function describeSelection(selection, rowCount, colCount) {
   const rowSpan = selection.r2 - selection.r1 + 1;
   const colSpan = selection.c2 - selection.c1 + 1;
-  const cellCount = rowSpan * colSpan;
+  const cellCount = selectionCellCount(selection);
   const coversAllRows = selection.r1 === 0 && selection.r2 === rowCount - 1;
   const coversAllCols = selection.c1 === 0 && selection.c2 === colCount - 1;
   let label = `${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)}`;
@@ -599,7 +617,8 @@ export function Spreadsheet({
     if (activeCell.row >= selection.r1 && activeCell.row <= selection.r2 && activeCell.col >= selection.c1 && activeCell.col <= selection.c2) setFormulaDraft('');
     showToast(`Cleared ${count.toLocaleString()} cell${count === 1 ? '' : 's'}`);
   }, [committedSelection, activeCell, dispatchWorkbookCommand, getDefaultCellValue, showToast, onCellChange, validateEditCells]);
-  const getDefaultCellsForSelection = useCallback((selection) => {
+  const getDefaultCellsForSelection = useCallback((selection, options = {}) => {
+    if (options.sparse || selectionCellCount(selection) > BULK_RANGE_CELL_LIMIT) return undefined;
     const sheet = getActiveSheet(workbookRef.current);
     const defaultCells = {};
     for (let row = selection.r1; row <= selection.r2; row++) {
@@ -615,12 +634,14 @@ export function Spreadsheet({
   }, [getDefaultCellValue]);
   const formatSelection = useCallback((format, label, replace = false) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    const sparse = shouldUseSparseRange(selection);
     const command = {
       type: CommandType.SET_RANGE_FORMAT,
       range: selection,
       format,
       replace,
-      defaultCells: getDefaultCellsForSelection(selection),
+      sparse,
+      defaultCells: getDefaultCellsForSelection(selection, {sparse}),
       label: `Format ${label}`,
     };
     const result = dispatchWorkbookCommand(command, {}, {source: 'format'});
@@ -631,12 +652,14 @@ export function Spreadsheet({
   }, [activeCell, committedSelection, dispatchWorkbookCommand, getDefaultCellsForSelection, onCellChange, showToast]);
   const styleSelection = useCallback((style, label, replace = false) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
+    const sparse = shouldUseSparseRange(selection);
     const command = {
       type: CommandType.SET_RANGE_STYLE,
       range: selection,
       style,
       replace,
-      defaultCells: getDefaultCellsForSelection(selection),
+      sparse,
+      defaultCells: getDefaultCellsForSelection(selection, {sparse}),
       label: `Style ${label}`,
     };
     const result = dispatchWorkbookCommand(command, {}, {source: 'style'});
@@ -647,12 +670,13 @@ export function Spreadsheet({
   }, [activeCell, committedSelection, dispatchWorkbookCommand, getDefaultCellsForSelection, onCellChange, showToast]);
   const clearSelectionFormatting = useCallback(() => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
-    const defaultCells = getDefaultCellsForSelection(selection);
+    const sparse = shouldUseSparseRange(selection);
+    const defaultCells = getDefaultCellsForSelection(selection, {sparse});
     const command = {
       type: CommandType.BATCH,
       commands: [
-        {type: CommandType.SET_RANGE_FORMAT, range: selection, format: undefined, replace: true, defaultCells},
-        {type: CommandType.SET_RANGE_STYLE, range: selection, style: undefined, replace: true, defaultCells},
+        {type: CommandType.SET_RANGE_FORMAT, range: selection, format: undefined, replace: true, sparse, defaultCells},
+        {type: CommandType.SET_RANGE_STYLE, range: selection, style: undefined, replace: true, sparse, defaultCells},
       ],
       label: 'Clear formatting',
     };
@@ -668,6 +692,11 @@ export function Spreadsheet({
       showToast('Select multiple rows to sort', 'error');
       return;
     }
+    const sortCellCount = sortableCellCount(selection);
+    if (sortCellCount > BULK_SORT_CELL_LIMIT) {
+      showToast(`Sort a bounded table range under ${BULK_SORT_CELL_LIMIT.toLocaleString()} cells`, 'error');
+      return;
+    }
     const sortCol = activeCell.col >= selection.c1 && activeCell.col <= selection.c2 ? activeCell.col : selection.c1;
     const command = {
       type: CommandType.SORT_RANGE,
@@ -677,7 +706,13 @@ export function Spreadsheet({
       defaultCells: getDefaultCellsForSelection(selection),
       label: direction === 'asc' ? 'Sort ascending' : 'Sort descending',
     };
-    const result = dispatchWorkbookCommand(command, {getDefaultCellValue}, {source: 'sort'});
+    let result;
+    try {
+      result = dispatchWorkbookCommand(command, {getDefaultCellValue}, {source: 'sort'});
+    } catch (error) {
+      showToast(error?.message || 'Sort failed', 'error');
+      return;
+    }
     setDataVersion((v) => v + 1);
     syncFormulaDraftFromWorkbook(result.workbook);
     onCellChange?.({selection, sort: {col: sortCol, direction}, cells: getActiveSheet(result.workbook).cells, workbook: result.workbook, recalculated: result.recalculated});
@@ -1353,8 +1388,9 @@ export function Spreadsheet({
     [activeCell, colCount, committedSelection, rowCount],
   );
   const activeCellRecord = getCellRecord(workbook, activeSheet.id, activeCell.row, activeCell.col);
-  const currentFillColor = activeCellRecord?.style?.backgroundColor;
-  const currentTextColor = activeCellRecord?.style?.color;
+  const activeCellStyle = getEffectiveCellStyle(activeSheet, activeCell.row, activeCell.col, activeCellRecord?.style);
+  const currentFillColor = activeCellStyle?.backgroundColor;
+  const currentTextColor = activeCellStyle?.color;
   const formulaPreview = useMemo(() => previewFormulaDraft(
     workbook,
     activeSheet.id,
