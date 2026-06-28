@@ -283,6 +283,8 @@ test('top-level spreadsheet shell renders toolbar, formula bar, grid, and sheet 
   assert.match(html, /Formula for B2/);
   assert.match(html, /Workbook sheets/);
   assert.match(html, /Sheet1/);
+  assert.match(html, /Select column A/);
+  assert.match(html, /Select row 1/);
   assert.match(html, /42/);
   assert.match(html, /84/);
   assert.match(html, /class="cell /);
@@ -304,6 +306,10 @@ test('spreadsheet shell keeps toolbar and context-menu action contracts implemen
     assert.match(contextMenuSource, new RegExp(`['"]${action}['"]`), `${action} should be exposed by NativeContextMenu`);
     assert.match(menuUsage, new RegExp(`action === ['"]${action}['"]`), `${action} should be handled by Spreadsheet`);
   }
+  assert.match(spreadsheetSource, /onColumnHeaderPointerDown/);
+  assert.match(spreadsheetSource, /onRowHeaderPointerDown/);
+  assert.match(spreadsheetSource, /aria-label=\{`Select column \$\{name\}`\}/);
+  assert.match(spreadsheetSource, /aria-label=\{`Select row \$\{row \+ 1\}`\}/);
   assert.match(spreadsheetSource, /<NativeContextMenu menu=\{menu\} onAction=\{handleMenuAction\}/);
 });
 

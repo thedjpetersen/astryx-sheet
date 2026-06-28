@@ -203,6 +203,11 @@ function applyClearRange(workbook, command) {
   };
 }
 
+function getCommandDefaultCell(command, key) {
+  if (!command.defaultCells || !Object.prototype.hasOwnProperty.call(command.defaultCells, key)) return null;
+  return normalizeCellRecord(command.defaultCells[key]);
+}
+
 function applySetRangeFormat(workbook, command) {
   const sheetId = command.sheetId || workbook.activeSheetId;
   const oldCells = [];
@@ -211,7 +216,7 @@ function applySetRangeFormat(workbook, command) {
       const key = cellKey(point.row, point.col);
       const oldCell = cloneCellRecord(sheet.cells.get(key));
       oldCells.push({row: point.row, col: point.col, cell: oldCell});
-      const nextCell = normalizeCellRecord(oldCell || {value: ''}) || {value: ''};
+      const nextCell = normalizeCellRecord(oldCell || getCommandDefaultCell(command, key) || {value: ''}) || {value: ''};
       nextCell.format = command.replace
         ? command.format
         : mergeCellFormat(nextCell.format, command.format);
@@ -233,7 +238,7 @@ function applySetRangeStyle(workbook, command) {
       const key = cellKey(point.row, point.col);
       const oldCell = cloneCellRecord(sheet.cells.get(key));
       oldCells.push({row: point.row, col: point.col, cell: oldCell});
-      const nextCell = normalizeCellRecord(oldCell || {value: ''}) || {value: ''};
+      const nextCell = normalizeCellRecord(oldCell || getCommandDefaultCell(command, key) || {value: ''}) || {value: ''};
       nextCell.style = command.replace
         ? mergeCellStyle(undefined, command.style)
         : mergeCellStyle(nextCell.style, command.style);
@@ -283,9 +288,9 @@ function applySortRange(workbook, command) {
       const cells = [];
       for (let col = range.c1; col <= range.c2; col++) {
         const key = cellKey(row, col);
-        const cell = cloneCellRecord(sheet.cells.get(key));
-        oldCells.push({row, col, cell});
-        cells.push({col, cell});
+        const oldCell = cloneCellRecord(sheet.cells.get(key));
+        oldCells.push({row, col, cell: oldCell});
+        cells.push({col, cell: oldCell || getCommandDefaultCell(command, key)});
       }
       rows.push({sourceRow: row, cells});
     }

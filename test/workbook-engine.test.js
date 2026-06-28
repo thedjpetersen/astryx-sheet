@@ -3022,6 +3022,33 @@ test('range style commands style cells and undo cleanly', () => {
   assert.equal(getCellRecord(workbook, 'sheet-1', 0, 1), null);
 });
 
+test('range format and style commands preserve supplied default cell values', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_RANGE_STYLE,
+    range: {r1: 1, c1: 0, r2: 1, c2: 0},
+    style: {fontWeight: 700},
+    defaultCells: {'1:0': 'North'},
+  });
+
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 0), 'North');
+  assert.equal(getCellRecord(workbook, 'sheet-1', 1, 0).style.fontWeight, 700);
+
+  workbook = undo(workbook);
+  assert.equal(getCellRecord(workbook, 'sheet-1', 1, 0), null);
+
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SET_RANGE_FORMAT,
+    range: {r1: 1, c1: 1, r2: 1, c2: 1},
+    format: {type: NumberFormatType.CURRENCY, currency: 'USD', decimals: 2},
+    defaultCells: {'1:1': '1280'},
+  });
+
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 1), '1280');
+  assert.equal(getCellDisplayValue(workbook, 'sheet-1', 1, 1), '$1,280.00');
+  assert.deepEqual(getCellRecord(workbook, 'sheet-1', 1, 1).format, {type: 'currency', currency: 'USD', decimals: 2});
+});
+
 test('sort range command orders rows and restores with undo', () => {
   let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
   workbook = dispatchCommand(workbook, {
@@ -3053,6 +3080,32 @@ test('sort range command orders rows and restores with undo', () => {
   assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 0), 'Ada');
   assert.equal(getCellRawValue(workbook, 'sheet-1', 2, 0), 'Grace');
   assert.equal(getCellRawValue(workbook, 'sheet-1', 3, 0), 'Linus');
+});
+
+test('sort range command orders supplied default cell values', () => {
+  let workbook = createWorkbook({sheets: [{id: 'sheet-1'}]});
+  workbook = dispatchCommand(workbook, {
+    type: CommandType.SORT_RANGE,
+    range: {r1: 1, c1: 0, r2: 3, c2: 1},
+    sortBy: [{col: 1, direction: 'asc', type: 'number'}],
+    defaultCells: {
+      '1:0': 'Charlie',
+      '1:1': '3',
+      '2:0': 'Ada',
+      '2:1': '1',
+      '3:0': 'Grace',
+      '3:1': '2',
+    },
+  });
+
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 1, 0), 'Ada');
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 2, 0), 'Grace');
+  assert.equal(getCellRawValue(workbook, 'sheet-1', 3, 0), 'Charlie');
+
+  workbook = undo(workbook);
+  assert.equal(getCellRecord(workbook, 'sheet-1', 1, 0), null);
+  assert.equal(getCellRecord(workbook, 'sheet-1', 2, 0), null);
+  assert.equal(getCellRecord(workbook, 'sheet-1', 3, 0), null);
 });
 
 test('filter commands track visible rows and restore with undo', () => {

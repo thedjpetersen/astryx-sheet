@@ -178,7 +178,7 @@ export function SpreadsheetToolbar({
           <RibbonButton label="Undo" icon={icon(Undo2)} onClick={onUndo} isDisabled={!canUndo} size="icon" />
           <RibbonButton label="Redo" icon={icon(Redo2)} onClick={onRedo} isDisabled={!canRedo} size="icon" />
           <RibbonButton label="Edit" icon={icon(Pencil)} onClick={onEditActiveCell} />
-          <RibbonButton label="Clear" icon={icon(Eraser)} onClick={onClearSelection} />
+          <RibbonButton label="Clear" icon={icon(Eraser)} onClick={onClearSelection}>Clear cells</RibbonButton>
         </RibbonGroup>
         <RibbonGroup label="Number">
           <RibbonButton label="Number" icon={icon(Hash)} onClick={onFormatNumber} />
@@ -190,27 +190,27 @@ export function SpreadsheetToolbar({
           <RibbonButton label="Bold" icon={icon(Bold)} onClick={onStyleBold} />
           <RibbonButton label="Border" icon={icon(Square)} onClick={onStyleBorder} />
           <RibbonButton label="Fill" icon={icon(PaintBucket)} onClick={onStyleFill} />
-          <RibbonButton label="Text color" icon={icon(Type)} onClick={onStyleText}>Text</RibbonButton>
+          <RibbonButton label="Text color" icon={icon(Type)} onClick={onStyleText}>Text color</RibbonButton>
         </RibbonGroup>
         <RibbonGroup label="Data">
           <RibbonButton label="Sort A-Z" icon={icon(ArrowDownAZ)} onClick={onSortAscending} />
           <RibbonButton label="Sort Z-A" icon={icon(ArrowUpZA)} onClick={onSortDescending} />
           <RibbonButton label="Filter" icon={icon(Filter)} onClick={onFilterSelection} />
-          <RibbonButton label="Clear filter" icon={icon(FilterX)} onClick={onClearFilter}>Clear</RibbonButton>
+          <RibbonButton label="Clear filter" icon={icon(FilterX)} onClick={onClearFilter}>Clear filter</RibbonButton>
         </RibbonGroup>
         <RibbonGroup label="Cells">
           <RibbonButton label="Merge" icon={icon(Combine)} onClick={onMergeSelection} />
           <RibbonButton label="Unmerge" icon={icon(Split)} onClick={onUnmergeSelection} />
-          <RibbonButton label="Widen column" icon={icon(UnfoldHorizontal)} onClick={onWidenActiveColumn}>Column</RibbonButton>
-          <RibbonButton label="Taller row" icon={icon(UnfoldVertical)} onClick={onTallerActiveRow}>Row</RibbonButton>
+          <RibbonButton label="Widen column" icon={icon(UnfoldHorizontal)} onClick={onWidenActiveColumn}>Widen</RibbonButton>
+          <RibbonButton label="Taller row" icon={icon(UnfoldVertical)} onClick={onTallerActiveRow}>Taller</RibbonButton>
         </RibbonGroup>
         <RibbonGroup label="Rules">
-          <RibbonButton label="Number rule" icon={icon(ListChecks)} onClick={onValidateNumber}>Number</RibbonButton>
-          <RibbonButton label="List rule" icon={icon(Rows3)} onClick={onValidateList}>List</RibbonButton>
-          <RibbonButton label="Clear rule" icon={icon(ListX)} onClick={onClearValidation}>Clear</RibbonButton>
-          <RibbonButton label="Highlight greater than" icon={icon(Highlighter)} onClick={onHighlightGreaterThan}>Greater</RibbonButton>
-          <RibbonButton label="Highlight text" icon={icon(Highlighter)} onClick={onHighlightTextContains}>Text</RibbonButton>
-          <RibbonButton label="Clear highlight" icon={icon(BrushCleaning)} onClick={onClearConditionalFormat}>Clear</RibbonButton>
+          <RibbonButton label="Number rule" icon={icon(ListChecks)} onClick={onValidateNumber}>Number rule</RibbonButton>
+          <RibbonButton label="List rule" icon={icon(Rows3)} onClick={onValidateList}>List rule</RibbonButton>
+          <RibbonButton label="Clear rule" icon={icon(ListX)} onClick={onClearValidation}>Clear rule</RibbonButton>
+          <RibbonButton label="Highlight greater than" icon={icon(Highlighter)} onClick={onHighlightGreaterThan}>Greater than</RibbonButton>
+          <RibbonButton label="Highlight text" icon={icon(Highlighter)} onClick={onHighlightTextContains}>Text contains</RibbonButton>
+          <RibbonButton label="Clear highlight" icon={icon(BrushCleaning)} onClick={onClearConditionalFormat}>Clear highlight</RibbonButton>
         </RibbonGroup>
         <RibbonGroup label="Names">
           <RibbonButton label="Name" icon={icon(Tag)} onClick={onNameSelection} />

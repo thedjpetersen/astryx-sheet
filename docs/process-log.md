@@ -143,6 +143,7 @@
 - Added dynamic-array `SORTBY` and volatile `RANDARRAY` evaluation, including multi-key sort vectors, deterministic random testing hooks, picker templates, diagnostics, and spill-aware recalculation coverage.
 - Added Vite-backed UI component wiring tests for toolbar commands, formula-editor prop forwarding, view controls, context-menu actions, sheet tabs, function picker rendering, and cell state rendering.
 - Fixed mounted UI wiring gaps found during browser smoke testing: context-menu item clicks now reach spreadsheet actions, removing the active sheet recalculates against the surviving sheet, and formula-bar styles avoid React shorthand/longhand conflicts.
+- Wired row and column headers as selectable controls, including header-drag ranges and context-menu entry points, and fixed toolbar range actions so formatting, styling, and sorting preserve generated default cell values instead of materializing blanks.
 
 ## Current Direction
 

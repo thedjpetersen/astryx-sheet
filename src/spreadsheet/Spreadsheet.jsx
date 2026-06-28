@@ -12,7 +12,7 @@ import {RowFragment} from './components/RowFragment.jsx';
 import {SheetTabs} from './components/SheetTabs.jsx';
 import {SpreadsheetToolbar} from './components/SpreadsheetToolbar.jsx';
 import {CommandType, ConditionalFormatType, NumberFormatType, createFillDownCommand, createFillRightCommand, createImportHtmlTableCommand, createPasteTsvCommand, createSheetDataRef, createWorkbookController, getActiveSheet, getCellRawValue, getCellRecord, getCellSpillRange, getConditionalFormatRulesForCell, getMergeAtCell, getValidationRulesForCell, getVisibleRowsForSheet, listNamedRanges, normalizeName, previewFormulaDraft, rangeToHtmlTable, rangeToTsv, validateCellValue} from './engine/index.js';
-import {cellAddress, columnName} from './model/address.js';
+import {cellAddress, cellKey, columnName} from './model/address.js';
 import {DEFAULT_GRID_CONFIG} from './model/constants.js';
 import {createDefaultCellData, createDefaultColWidths, createDefaultRowHeights, defaultCellValue} from './model/defaultData.js';
 import {createFormulaTemplate, formulaReferenceForSelection, getFormulaEditorReferenceHighlights, insertFormulaReferenceDraft, readCell} from './model/formulas.js';
@@ -27,6 +27,26 @@ function clampPoint(point, gridConfig) {
     row: Math.max(0, Math.min(gridConfig.rows - 1, point.row)),
     col: Math.max(0, Math.min(gridConfig.cols - 1, point.col)),
   };
+}
+
+function clampIndex(value, max) {
+  return Math.max(0, Math.min(max, value));
+}
+
+function selectionFromLiveSelection(live, rowCount, colCount) {
+  if (live?.mode === 'row-header') {
+    return normalizeSelection(
+      {row: live.anchor.row, col: 0},
+      {row: live.extent.row, col: colCount - 1},
+    );
+  }
+  if (live?.mode === 'column-header') {
+    return normalizeSelection(
+      {row: 0, col: live.anchor.col},
+      {row: rowCount - 1, col: live.extent.col},
+    );
+  }
+  return normalizeSelection(live.anchor, live.extent);
 }
 
 function createNextSheetName(workbook) {
@@ -441,13 +461,13 @@ export function Spreadsheet({
     const overlay = selectionOverlayRef.current;
     if (!overlay) return;
     const live = selectionRef.current;
-    const selection = normalizeSelection(live.anchor, live.extent);
+    const selection = selectionFromLiveSelection(live, rowCount, colCount);
     const left = colMetrics.offset(selection.c1);
     const top = rowMetrics.offset(selection.r1);
     overlay.style.transform = `translate3d(${left}px, ${top}px, 0)`;
     overlay.style.width = `${colMetrics.span(selection.c1, selection.c2)}px`;
     overlay.style.height = `${rowMetrics.span(selection.r1, selection.r2)}px`;
-  }, [rowMetrics, colMetrics]);
+  }, [rowMetrics, colMetrics, rowCount, colCount]);
   const scheduleDrawSelection = useRafCallback(drawSelectionOverlay);
   const applyFormulaReferenceSelection = useCallback((selection, edit = formulaReferenceEditRef.current) => {
     if (!edit) return;
@@ -467,6 +487,39 @@ export function Spreadsheet({
     formulaReferenceEditRef.current = null;
     scheduleDrawSelection();
   }, [cellDataRef, gridConfig, getDefaultCellValue, setActiveCell, setCommittedSelection, scheduleDrawSelection]);
+  const selectHeaderRange = useCallback((selection, point, liveSelection) => {
+    const nextPoint = clampPoint(point, gridConfig);
+    selectionRef.current = liveSelection;
+    setActiveCell(nextPoint);
+    setCommittedSelection(selection);
+    setFormulaDraft(readCell(cellDataRef, nextPoint.row, nextPoint.col, getDefaultCellValue));
+    setFormulaEditorActive(false);
+    formulaReferenceEditRef.current = null;
+    setEditor(null);
+    setMenu((m) => ({...m, open: false}));
+    setFormulaPickerOpen(false);
+    scheduleDrawSelection();
+  }, [cellDataRef, getDefaultCellValue, gridConfig, scheduleDrawSelection, setActiveCell, setCommittedSelection]);
+  const selectWholeRow = useCallback((row, dragging = false) => {
+    const nextRow = clampIndex(row, rowCount - 1);
+    const selection = {r1: nextRow, c1: 0, r2: nextRow, c2: colCount - 1};
+    selectHeaderRange(selection, {row: nextRow, col: 0}, {
+      dragging,
+      anchor: {row: nextRow, col: 0},
+      extent: {row: nextRow, col: 0},
+      mode: 'row-header',
+    });
+  }, [colCount, rowCount, selectHeaderRange]);
+  const selectWholeColumn = useCallback((col, dragging = false) => {
+    const nextCol = clampIndex(col, colCount - 1);
+    const selection = {r1: 0, c1: nextCol, r2: rowCount - 1, c2: nextCol};
+    selectHeaderRange(selection, {row: 0, col: nextCol}, {
+      dragging,
+      anchor: {row: 0, col: nextCol},
+      extent: {row: 0, col: nextCol},
+      mode: 'column-header',
+    });
+  }, [colCount, rowCount, selectHeaderRange]);
   const openEditor = useCallback((row, col, seed) => {
     setEditor({
       row,
@@ -502,12 +555,27 @@ export function Spreadsheet({
     if (activeCell.row >= selection.r1 && activeCell.row <= selection.r2 && activeCell.col >= selection.c1 && activeCell.col <= selection.c2) setFormulaDraft('');
     showToast(`Cleared ${count.toLocaleString()} cell${count === 1 ? '' : 's'}`);
   }, [committedSelection, activeCell, dispatchWorkbookCommand, getDefaultCellValue, showToast, onCellChange, validateEditCells]);
+  const getDefaultCellsForSelection = useCallback((selection) => {
+    const sheet = getActiveSheet(workbookRef.current);
+    const defaultCells = {};
+    for (let row = selection.r1; row <= selection.r2; row++) {
+      for (let col = selection.c1; col <= selection.c2; col++) {
+        const key = cellKey(row, col);
+        if (sheet.cells.has(key)) continue;
+        const value = getDefaultCellValue(row, col);
+        if (value == null || value === '') continue;
+        defaultCells[key] = value;
+      }
+    }
+    return Object.keys(defaultCells).length ? defaultCells : undefined;
+  }, [getDefaultCellValue]);
   const formatSelection = useCallback((format, label) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     const command = {
       type: CommandType.SET_RANGE_FORMAT,
       range: selection,
       format,
+      defaultCells: getDefaultCellsForSelection(selection),
       label: `Format ${label}`,
     };
     const result = dispatchWorkbookCommand(command, {}, {source: 'format'});
@@ -515,13 +583,14 @@ export function Spreadsheet({
     onCellChange?.({selection, format, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
     setDataVersion((v) => v + 1);
     showToast(`Formatted ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)} as ${label}`);
-  }, [activeCell, committedSelection, dispatchWorkbookCommand, onCellChange, showToast]);
+  }, [activeCell, committedSelection, dispatchWorkbookCommand, getDefaultCellsForSelection, onCellChange, showToast]);
   const styleSelection = useCallback((style, label) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     const command = {
       type: CommandType.SET_RANGE_STYLE,
       range: selection,
       style,
+      defaultCells: getDefaultCellsForSelection(selection),
       label: `Style ${label}`,
     };
     const result = dispatchWorkbookCommand(command, {}, {source: 'style'});
@@ -529,7 +598,7 @@ export function Spreadsheet({
     onCellChange?.({selection, style, cells: getActiveSheet(nextWorkbook).cells, workbook: nextWorkbook});
     setDataVersion((v) => v + 1);
     showToast(`Styled ${cellAddress(selection.r1, selection.c1)}:${cellAddress(selection.r2, selection.c2)} as ${label}`);
-  }, [activeCell, committedSelection, dispatchWorkbookCommand, onCellChange, showToast]);
+  }, [activeCell, committedSelection, dispatchWorkbookCommand, getDefaultCellsForSelection, onCellChange, showToast]);
   const sortSelection = useCallback((direction) => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     if (selection.r2 <= selection.r1) {
@@ -542,6 +611,7 @@ export function Spreadsheet({
       range: selection,
       hasHeader: selection.r1 === 0,
       sortBy: [{col: sortCol, direction, type: 'auto'}],
+      defaultCells: getDefaultCellsForSelection(selection),
       label: direction === 'asc' ? 'Sort ascending' : 'Sort descending',
     };
     const result = dispatchWorkbookCommand(command, {getDefaultCellValue}, {source: 'sort'});
@@ -549,7 +619,7 @@ export function Spreadsheet({
     syncFormulaDraftFromWorkbook(result.workbook);
     onCellChange?.({selection, sort: {col: sortCol, direction}, cells: getActiveSheet(result.workbook).cells, workbook: result.workbook, recalculated: result.recalculated});
     showToast(direction === 'asc' ? 'Sorted ascending' : 'Sorted descending');
-  }, [activeCell, committedSelection, dispatchWorkbookCommand, getDefaultCellValue, onCellChange, showToast, syncFormulaDraftFromWorkbook]);
+  }, [activeCell, committedSelection, dispatchWorkbookCommand, getDefaultCellValue, getDefaultCellsForSelection, onCellChange, showToast, syncFormulaDraftFromWorkbook]);
   const filterSelectionByActiveValue = useCallback(() => {
     const selection = committedSelection || normalizeSelection(activeCell, activeCell);
     if (selection.r2 <= selection.r1) {
@@ -939,12 +1009,18 @@ export function Spreadsheet({
     const onPointerMove = (event) => {
       if (selectionRef.current.dragging) {
         const rect = viewportRef.current.getBoundingClientRect();
-        selectionRef.current.extent = {
-          row: rowMetrics.indexAt(Math.max(0, event.clientY - rect.top + scrollRef.current.top)),
-          col: colMetrics.indexAt(Math.max(0, event.clientX - rect.left + scrollRef.current.left)),
-        };
+        const liveSelection = selectionRef.current;
+        const nextRow = clampIndex(rowMetrics.indexAt(Math.max(0, event.clientY - rect.top + scrollRef.current.top)), rowCount - 1);
+        const nextCol = clampIndex(colMetrics.indexAt(Math.max(0, event.clientX - rect.left + scrollRef.current.left)), colCount - 1);
+        if (liveSelection.mode === 'row-header') {
+          liveSelection.extent = {row: nextRow, col: liveSelection.anchor.col};
+        } else if (liveSelection.mode === 'column-header') {
+          liveSelection.extent = {row: liveSelection.anchor.row, col: nextCol};
+        } else {
+          liveSelection.extent = {row: nextRow, col: nextCol};
+        }
         if (selectionRef.current.mode === 'formula-reference') {
-          applyFormulaReferenceSelection(normalizeSelection(selectionRef.current.anchor, selectionRef.current.extent));
+          applyFormulaReferenceSelection(selectionFromLiveSelection(selectionRef.current, rowCount, colCount));
         }
         scheduleDrawSelection();
         return;
@@ -976,7 +1052,7 @@ export function Spreadsheet({
     const onPointerUp = () => {
       if (selectionRef.current.dragging) {
         selectionRef.current.dragging = false;
-        const selection = normalizeSelection(selectionRef.current.anchor, selectionRef.current.extent);
+        const selection = selectionFromLiveSelection(selectionRef.current, rowCount, colCount);
         setCommittedSelection(selection);
         if (selectionRef.current.mode === 'formula-reference') {
           applyFormulaReferenceSelection(selection);
@@ -1002,7 +1078,7 @@ export function Spreadsheet({
     window.addEventListener('pointermove', onPointerMove, {passive: true});
     window.addEventListener('pointerup', onPointerUp);
     return () => { window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', onPointerUp); };
-  }, [rowMetrics, colMetrics, scheduleDrawSelection, scheduleDimensionRender, headerHeight, sidebarWidth, setCommittedSelection, resizeColumn, resizeRow, applyFormulaReferenceSelection]);
+  }, [rowMetrics, colMetrics, rowCount, colCount, scheduleDrawSelection, scheduleDimensionRender, headerHeight, sidebarWidth, setCommittedSelection, resizeColumn, resizeRow, applyFormulaReferenceSelection]);
   useEffect(() => {
     const close = () => setMenu((m) => ({...m, open: false}));
     window.addEventListener('pointerdown', close);
@@ -1066,6 +1142,26 @@ export function Spreadsheet({
     setFormulaPickerOpen(false);
     scheduleDrawSelection();
   }, [cellDataRef, formulaCursorPosition, formulaDraft, formulaEditorActive, gridConfig, getDefaultCellValue, setActiveCell, setCommittedSelection, scheduleDrawSelection, applyFormulaReferenceSelection]);
+  const onRowHeaderPointerDown = useCallback((event, row) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    selectWholeRow(row, true);
+  }, [selectWholeRow]);
+  const onColumnHeaderPointerDown = useCallback((event, col) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    selectWholeColumn(col, true);
+  }, [selectWholeColumn]);
+  const onRowHeaderKeyDown = useCallback((event, row) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    selectWholeRow(row);
+  }, [selectWholeRow]);
+  const onColumnHeaderKeyDown = useCallback((event, col) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    selectWholeColumn(col);
+  }, [selectWholeColumn]);
   const openContextMenu = useCallback((event, row, col) => {
     event.preventDefault(); event.stopPropagation();
     const point = clampPoint({row, col}, gridConfig);
@@ -1083,6 +1179,22 @@ export function Spreadsheet({
     const y = Math.min(event.clientY, window.innerHeight - 430);
     setMenu({open: true, x: Math.max(4, x), y: Math.max(4, y), row: point.row, col: point.col});
   }, [cellDataRef, committedSelection, gridConfig, getDefaultCellValue, setActiveCell, setCommittedSelection, scheduleDrawSelection]);
+  const openRowHeaderContextMenu = useCallback((event, row) => {
+    event.preventDefault(); event.stopPropagation();
+    const nextRow = clampIndex(row, rowCount - 1);
+    selectWholeRow(nextRow);
+    const x = Math.min(event.clientX, window.innerWidth - 228);
+    const y = Math.min(event.clientY, window.innerHeight - 430);
+    setMenu({open: true, x: Math.max(4, x), y: Math.max(4, y), row: nextRow, col: 0});
+  }, [rowCount, selectWholeRow]);
+  const openColumnHeaderContextMenu = useCallback((event, col) => {
+    event.preventDefault(); event.stopPropagation();
+    const nextCol = clampIndex(col, colCount - 1);
+    selectWholeColumn(nextCol);
+    const x = Math.min(event.clientX, window.innerWidth - 228);
+    const y = Math.min(event.clientY, window.innerHeight - 430);
+    setMenu({open: true, x: Math.max(4, x), y: Math.max(4, y), row: 0, col: nextCol});
+  }, [colCount, selectWholeColumn]);
   const onViewportContextMenu = useCallback((event) => {
     if (event.target?.classList?.contains('cell')) return;
     const rect = viewportRef.current.getBoundingClientRect();
@@ -1191,6 +1303,10 @@ export function Spreadsheet({
       getSpillRangeForCell: (_sheetName, row, col) => getCellSpillRange(activeSheet, row, col),
     });
   }, [activeSheet, colCount, formulaContext, formulaDraft, formulaEditorActive, rowCount]);
+  const selectionCoversAllRows = committedSelection?.r1 === 0 && committedSelection?.r2 === rowCount - 1;
+  const selectionCoversAllCols = committedSelection?.c1 === 0 && committedSelection?.c2 === colCount - 1;
+  const selectionIsWholeColumn = selectionCoversAllRows && !selectionCoversAllCols;
+  const selectionIsWholeRow = selectionCoversAllCols && !selectionCoversAllRows;
   const editorStyle = editor ? {left: colMetrics.offset(editor.col), top: rowMetrics.offset(editor.row), width: colMetrics.size(editor.col), height: rowMetrics.size(editor.row)} : {};
   const appClassName = [
     'app',
@@ -1284,14 +1400,45 @@ export function Spreadsheet({
             <div className="corner">✣</div>
             <div className="column-header"><div className="header-layer" ref={headerLayerRef} style={{width: totalWidth, height: headerHeight}}>
               {columns.map((col) => {
-                const inSelection = committedSelection && col >= committedSelection.c1 && col <= committedSelection.c2;
-                return <div key={col} className={`col-head-cell ${inSelection ? 'selected' : ''}`} style={{left: colMetrics.offset(col), width: colMetrics.size(col)}}>{columnName(col)}<span className="resize-col" onPointerDown={(e) => beginColResize(e, col)} /></div>;
+                const inSelection = committedSelection && !selectionIsWholeRow && col >= committedSelection.c1 && col <= committedSelection.c2;
+                const name = columnName(col);
+                return (
+                  <div
+                    key={col}
+                    className={`col-head-cell ${inSelection ? 'selected' : ''}`}
+                    style={{left: colMetrics.offset(col), width: colMetrics.size(col)}}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Select column ${name}`}
+                    title={`Select column ${name}`}
+                    onPointerDown={(event) => onColumnHeaderPointerDown(event, col)}
+                    onContextMenu={(event) => openColumnHeaderContextMenu(event, col)}
+                    onKeyDown={(event) => onColumnHeaderKeyDown(event, col)}>
+                    {name}
+                    <span className="resize-col" onPointerDown={(e) => beginColResize(e, col)} />
+                  </div>
+                );
               })}
             </div></div>
             <div className="row-header"><div className="row-layer" ref={rowLayerRef} style={{height: totalHeight, width: sidebarWidth}}>
               {renderedRows.map((row) => {
-                const inSelection = committedSelection && row >= committedSelection.r1 && row <= committedSelection.r2;
-                return <div key={row} className={`row-head-cell ${inSelection ? 'selected' : ''}`} style={{top: rowMetrics.offset(row), height: rowMetrics.size(row)}}>{row + 1}<span className="resize-row" onPointerDown={(e) => beginRowResize(e, row)} /></div>;
+                const inSelection = committedSelection && !selectionIsWholeColumn && row >= committedSelection.r1 && row <= committedSelection.r2;
+                return (
+                  <div
+                    key={row}
+                    className={`row-head-cell ${inSelection ? 'selected' : ''}`}
+                    style={{top: rowMetrics.offset(row), height: rowMetrics.size(row)}}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Select row ${row + 1}`}
+                    title={`Select row ${row + 1}`}
+                    onPointerDown={(event) => onRowHeaderPointerDown(event, row)}
+                    onContextMenu={(event) => openRowHeaderContextMenu(event, row)}
+                    onKeyDown={(event) => onRowHeaderKeyDown(event, row)}>
+                    {row + 1}
+                    <span className="resize-row" onPointerDown={(e) => beginRowResize(e, row)} />
+                  </div>
+                );
               })}
             </div></div>
             <div className="viewport" ref={viewportRef} onScroll={onScroll} onContextMenu={onViewportContextMenu} tabIndex={0}>
