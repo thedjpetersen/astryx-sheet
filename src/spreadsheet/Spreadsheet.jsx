@@ -500,26 +500,48 @@ export function Spreadsheet({
     setFormulaPickerOpen(false);
     scheduleDrawSelection();
   }, [cellDataRef, getDefaultCellValue, gridConfig, scheduleDrawSelection, setActiveCell, setCommittedSelection]);
-  const selectWholeRow = useCallback((row, dragging = false) => {
+  const selectWholeRow = useCallback((row, dragging = false, extendSelection = false) => {
     const nextRow = clampIndex(row, rowCount - 1);
-    const selection = {r1: nextRow, c1: 0, r2: nextRow, c2: colCount - 1};
-    selectHeaderRange(selection, {row: nextRow, col: 0}, {
+    const previousSelection = selectionRef.current;
+    const anchorRow = extendSelection
+      ? clampIndex(
+        previousSelection?.mode === 'row-header'
+          ? previousSelection.anchor.row
+          : committedSelection?.c1 === 0 && committedSelection?.c2 === colCount - 1
+            ? committedSelection.r1
+            : activeCell.row,
+        rowCount - 1,
+      )
+      : nextRow;
+    const selection = normalizeSelection({row: anchorRow, col: 0}, {row: nextRow, col: colCount - 1});
+    selectHeaderRange(selection, {row: anchorRow, col: 0}, {
       dragging,
-      anchor: {row: nextRow, col: 0},
+      anchor: {row: anchorRow, col: 0},
       extent: {row: nextRow, col: 0},
       mode: 'row-header',
     });
-  }, [colCount, rowCount, selectHeaderRange]);
-  const selectWholeColumn = useCallback((col, dragging = false) => {
+  }, [activeCell.row, colCount, committedSelection, rowCount, selectHeaderRange]);
+  const selectWholeColumn = useCallback((col, dragging = false, extendSelection = false) => {
     const nextCol = clampIndex(col, colCount - 1);
-    const selection = {r1: 0, c1: nextCol, r2: rowCount - 1, c2: nextCol};
-    selectHeaderRange(selection, {row: 0, col: nextCol}, {
+    const previousSelection = selectionRef.current;
+    const anchorCol = extendSelection
+      ? clampIndex(
+        previousSelection?.mode === 'column-header'
+          ? previousSelection.anchor.col
+          : committedSelection?.r1 === 0 && committedSelection?.r2 === rowCount - 1
+            ? committedSelection.c1
+            : activeCell.col,
+        colCount - 1,
+      )
+      : nextCol;
+    const selection = normalizeSelection({row: 0, col: anchorCol}, {row: rowCount - 1, col: nextCol});
+    selectHeaderRange(selection, {row: 0, col: anchorCol}, {
       dragging,
-      anchor: {row: 0, col: nextCol},
+      anchor: {row: 0, col: anchorCol},
       extent: {row: 0, col: nextCol},
       mode: 'column-header',
     });
-  }, [colCount, rowCount, selectHeaderRange]);
+  }, [activeCell.col, colCount, committedSelection, rowCount, selectHeaderRange]);
   const openEditor = useCallback((row, col, seed) => {
     setEditor({
       row,
@@ -1145,22 +1167,22 @@ export function Spreadsheet({
   const onRowHeaderPointerDown = useCallback((event, row) => {
     if (event.button !== 0) return;
     event.preventDefault();
-    selectWholeRow(row, true);
+    selectWholeRow(row, true, event.shiftKey);
   }, [selectWholeRow]);
   const onColumnHeaderPointerDown = useCallback((event, col) => {
     if (event.button !== 0) return;
     event.preventDefault();
-    selectWholeColumn(col, true);
+    selectWholeColumn(col, true, event.shiftKey);
   }, [selectWholeColumn]);
   const onRowHeaderKeyDown = useCallback((event, row) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
-    selectWholeRow(row);
+    selectWholeRow(row, false, event.shiftKey);
   }, [selectWholeRow]);
   const onColumnHeaderKeyDown = useCallback((event, col) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
-    selectWholeColumn(col);
+    selectWholeColumn(col, false, event.shiftKey);
   }, [selectWholeColumn]);
   const openContextMenu = useCallback((event, row, col) => {
     event.preventDefault(); event.stopPropagation();
@@ -1359,6 +1381,10 @@ export function Spreadsheet({
           onClearFilter={clearActiveFilter}
           onMergeSelection={mergeSelection}
           onUnmergeSelection={unmergeActiveRange}
+          onInsertRowAbove={() => insertRowAt(activeCell.row, 'above')}
+          onInsertRowBelow={() => insertRowAt(activeCell.row, 'below')}
+          onInsertColumnLeft={() => insertColumnAt(activeCell.col, 'left')}
+          onInsertColumnRight={() => insertColumnAt(activeCell.col, 'right')}
           onValidateNumber={applyNumberValidation}
           onValidateList={applyListValidation}
           onClearValidation={clearValidation}

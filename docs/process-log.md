@@ -144,6 +144,7 @@
 - Added Vite-backed UI component wiring tests for toolbar commands, formula-editor prop forwarding, view controls, context-menu actions, sheet tabs, function picker rendering, and cell state rendering.
 - Fixed mounted UI wiring gaps found during browser smoke testing: context-menu item clicks now reach spreadsheet actions, removing the active sheet recalculates against the surviving sheet, and formula-bar styles avoid React shorthand/longhand conflicts.
 - Wired row and column headers as selectable controls, including header-drag ranges and context-menu entry points, and fixed toolbar range actions so formatting, styling, and sorting preserve generated default cell values instead of materializing blanks.
+- Added Shift-click row and column header range selection, converted ribbon tabs into clickable controls, and exposed active-row/column insert commands through the Insert ribbon group.
 
 ## Current Direction
 

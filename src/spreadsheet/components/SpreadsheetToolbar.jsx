@@ -49,7 +49,7 @@ function icon(IconComponent, size = 16) {
 
 function RibbonGroup({label, children, className = ''}) {
   return (
-    <section className={`ribbon-group ${className}`} aria-label={label}>
+    <section className={`ribbon-group ${className}`} aria-label={label} data-ribbon-group={label}>
       <div className="ribbon-group-actions">{children}</div>
       <div className="ribbon-group-label">{label}</div>
     </section>
@@ -67,6 +67,36 @@ function RibbonButton({label, icon: buttonIcon, onClick, isDisabled, children, s
       aria-label={label}>
       <span className="ribbon-command-icon">{buttonIcon}</span>
       {size === 'icon' ? null : <span className="ribbon-command-label">{children ?? label}</span>}
+    </button>
+  );
+}
+
+function activateRibbonTab(event, targetGroup) {
+  const tab = event.currentTarget;
+  const topbar = tab.closest('.topbar');
+  if (!topbar) return;
+  topbar.querySelectorAll('.ribbon-tab').forEach((node) => {
+    const active = node === tab;
+    node.classList.toggle('active', active);
+    node.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  topbar.querySelector(`[data-ribbon-group="${targetGroup}"]`)?.scrollIntoView({
+    block: 'nearest',
+    inline: 'start',
+    behavior: 'smooth',
+  });
+}
+
+function RibbonTab({label, targetGroup, isActive = false, className = ''}) {
+  return (
+    <button
+      type="button"
+      className={`ribbon-tab ${className} ${isActive ? 'active' : ''}`.trim()}
+      role="tab"
+      aria-selected={isActive ? 'true' : 'false'}
+      aria-controls="spreadsheet-ribbon-tools"
+      onClick={(event) => activateRibbonTab(event, targetGroup)}>
+      {label}
     </button>
   );
 }
@@ -110,6 +140,10 @@ export function SpreadsheetToolbar({
   onClearFilter,
   onMergeSelection,
   onUnmergeSelection,
+  onInsertRowAbove,
+  onInsertRowBelow,
+  onInsertColumnLeft,
+  onInsertColumnRight,
   onValidateNumber,
   onValidateList,
   onClearValidation,
@@ -140,12 +174,12 @@ export function SpreadsheetToolbar({
         <Heading level={1}>{title}</Heading>
         {subtitle ? <Text type="supporting" display="block">{subtitle}</Text> : null}
       </div>
-      <div className="ribbon-tabs" aria-label="Ribbon tabs">
-        <span className="ribbon-tab file">File</span>
-        <span className="ribbon-tab active">Home</span>
-        <span className="ribbon-tab">Insert</span>
-        <span className="ribbon-tab">Data</span>
-        <span className="ribbon-tab">View</span>
+      <div className="ribbon-tabs" role="tablist" aria-label="Ribbon tabs">
+        <RibbonTab label="File" targetGroup="Clipboard" className="file" />
+        <RibbonTab label="Home" targetGroup="Clipboard" isActive />
+        <RibbonTab label="Insert" targetGroup="Insert" />
+        <RibbonTab label="Data" targetGroup="Data" />
+        <RibbonTab label="View" targetGroup="View" />
       </div>
       <div className="formula-wrap">
         <FormulaEditor
@@ -169,7 +203,7 @@ export function SpreadsheetToolbar({
           <Token color="green" label={`${mountedCount.toLocaleString()} mounted`} />
         </div>
       ) : null}
-      <div className="ribbon-tools" aria-label="Spreadsheet commands">
+      <div className="ribbon-tools" id="spreadsheet-ribbon-tools" aria-label="Spreadsheet commands">
         <RibbonGroup label="Clipboard">
           <RibbonButton label="Paste" icon={icon(ClipboardPaste, 24)} onClick={onPasteClipboard} size="large" />
           <RibbonButton label="Copy" icon={icon(Copy)} onClick={onCopySelection} />
@@ -191,6 +225,12 @@ export function SpreadsheetToolbar({
           <RibbonButton label="Border" icon={icon(Square)} onClick={onStyleBorder} />
           <RibbonButton label="Fill" icon={icon(PaintBucket)} onClick={onStyleFill} />
           <RibbonButton label="Text color" icon={icon(Type)} onClick={onStyleText}>Text color</RibbonButton>
+        </RibbonGroup>
+        <RibbonGroup label="Insert">
+          <RibbonButton label="Insert row above" icon={icon(Rows3)} onClick={onInsertRowAbove}>Row above</RibbonButton>
+          <RibbonButton label="Insert row below" icon={icon(Rows3)} onClick={onInsertRowBelow}>Row below</RibbonButton>
+          <RibbonButton label="Insert column left" icon={icon(UnfoldHorizontal)} onClick={onInsertColumnLeft}>Column left</RibbonButton>
+          <RibbonButton label="Insert column right" icon={icon(UnfoldHorizontal)} onClick={onInsertColumnRight}>Column right</RibbonButton>
         </RibbonGroup>
         <RibbonGroup label="Data">
           <RibbonButton label="Sort A-Z" icon={icon(ArrowDownAZ)} onClick={onSortAscending} />

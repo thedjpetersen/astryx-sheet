@@ -104,6 +104,10 @@ function toolbarProps(overrides = {}) {
     'onClearFilter',
     'onMergeSelection',
     'onUnmergeSelection',
+    'onInsertRowAbove',
+    'onInsertRowBelow',
+    'onInsertColumnLeft',
+    'onInsertColumnRight',
     'onValidateNumber',
     'onValidateList',
     'onClearValidation',
@@ -172,6 +176,10 @@ const toolbarCommandCallbacks = Object.freeze([
   'onClearFilter',
   'onMergeSelection',
   'onUnmergeSelection',
+  'onInsertRowAbove',
+  'onInsertRowBelow',
+  'onInsertColumnLeft',
+  'onInsertColumnRight',
   'onValidateNumber',
   'onValidateList',
   'onClearValidation',
@@ -235,6 +243,10 @@ test('spreadsheet toolbar command buttons are wired to their callbacks', async (
     ['Clear filter', 'onClearFilter'],
     ['Merge', 'onMergeSelection'],
     ['Unmerge', 'onUnmergeSelection'],
+    ['Insert row above', 'onInsertRowAbove'],
+    ['Insert row below', 'onInsertRowBelow'],
+    ['Insert column left', 'onInsertColumnLeft'],
+    ['Insert column right', 'onInsertColumnRight'],
     ['Widen column', 'onWidenActiveColumn'],
     ['Taller row', 'onTallerActiveRow'],
     ['Number rule', 'onValidateNumber'],
@@ -308,6 +320,8 @@ test('spreadsheet shell keeps toolbar and context-menu action contracts implemen
   }
   assert.match(spreadsheetSource, /onColumnHeaderPointerDown/);
   assert.match(spreadsheetSource, /onRowHeaderPointerDown/);
+  assert.match(spreadsheetSource, /selectWholeColumn\(col, true, event\.shiftKey\)/);
+  assert.match(spreadsheetSource, /selectWholeRow\(row, true, event\.shiftKey\)/);
   assert.match(spreadsheetSource, /aria-label=\{`Select column \$\{name\}`\}/);
   assert.match(spreadsheetSource, /aria-label=\{`Select row \$\{row \+ 1\}`\}/);
   assert.match(spreadsheetSource, /<NativeContextMenu menu=\{menu\} onAction=\{handleMenuAction\}/);
@@ -333,6 +347,14 @@ test('spreadsheet toolbar forwards formula editor and view controls', async () =
   const redo = ribbonButtons.find((button) => button.props.label === 'Redo');
   assert.equal(undo.type(undo.props).props.disabled, true);
   assert.equal(redo.type(redo.props).props.disabled, true);
+
+  const ribbonTabs = collectElements(toolbar, (element) => element.type?.name === 'RibbonTab');
+  assert.deepEqual(ribbonTabs.map((tab) => tab.props.label), ['File', 'Home', 'Insert', 'Data', 'View']);
+  assert.deepEqual(ribbonTabs.map((tab) => tab.props.targetGroup), ['Clipboard', 'Clipboard', 'Insert', 'Data', 'View']);
+  const insertTab = ribbonTabs.find((tab) => tab.props.label === 'Insert').type(ribbonTabs.find((tab) => tab.props.label === 'Insert').props);
+  assert.equal(insertTab.type, 'button');
+  assert.equal(insertTab.props.role, 'tab');
+  assert.equal(typeof insertTab.props.onClick, 'function');
 
   const themeSelector = collectElements(toolbar, (element) => element.props?.label === 'Theme' && element.props?.options)[0];
   assert.ok(themeSelector);
