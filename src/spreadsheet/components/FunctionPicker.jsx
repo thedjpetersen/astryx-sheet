@@ -110,8 +110,10 @@ export function FunctionPicker({open, activeAddress, formulaDraft, selection, on
           ) : <Text type="supporting">No matches</Text>}
         </aside>
       </div>
-      <div className="formula-preview">Current: {formulaDraft || '=SUM(A1:B2)'}</div>
-      {activeHelp ? <Button label={`Insert ${activeHelp.name}`} variant="primary" size="sm" onClick={() => onPick(activeHelp.name)} /> : null}
+      <div className="function-picker-footer">
+        <div className="formula-preview">Current: {formulaDraft || '=SUM(A1:B2)'}</div>
+        {activeHelp ? <Button label={`Insert ${activeHelp.name}`} variant="primary" size="md" onClick={() => onPick(activeHelp.name)} /> : null}
+      </div>
     </Card>
   );
 }

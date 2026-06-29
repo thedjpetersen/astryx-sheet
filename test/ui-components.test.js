@@ -391,8 +391,8 @@ test('spreadsheet toolbar forwards formula editor and view controls', async () =
   assert.equal(redo.type(redo.props).props.disabled, true);
 
   const ribbonTabs = collectElements(toolbar, (element) => element.type?.name === 'RibbonTab');
-  assert.deepEqual(ribbonTabs.map((tab) => tab.props.label), ['File', 'Home', 'Insert', 'Data', 'View']);
-  assert.deepEqual(ribbonTabs.map((tab) => tab.props.targetGroup), ['Clipboard', 'Clipboard', 'Insert', 'Data', 'View']);
+  assert.deepEqual(ribbonTabs.map((tab) => tab.props.label), ['Home', 'Insert', 'Data', 'View']);
+  assert.deepEqual(ribbonTabs.map((tab) => tab.props.targetGroup), ['Clipboard', 'Insert', 'Data', 'View']);
   const insertTab = ribbonTabs.find((tab) => tab.props.label === 'Insert').type(ribbonTabs.find((tab) => tab.props.label === 'Insert').props);
   assert.equal(insertTab.type, 'button');
   assert.equal(insertTab.props.role, 'tab');
@@ -403,13 +403,16 @@ test('spreadsheet toolbar forwards formula editor and view controls', async () =
   assert.equal(themeSelector.props.value, 'neutral');
   assert.equal(themeSelector.props.onChange, handlers.onThemeNameChange);
 
-  const switches = collectElements(toolbar, (element) => element.props?.labelPosition === 'start');
-  assert.equal(switches.length, 3);
-  assert.equal(switches[0].props.value, false);
-  assert.equal(switches[0].props.onChange, handlers.onDarkModeChange);
-  assert.equal(switches[0].props.isDisabled, true);
-  assert.equal(switches[1].props.onChange, handlers.onCompactRowsChange);
-  assert.equal(switches[2].props.onChange, handlers.onHighContrastSelectionChange);
+  const toggles = collectElements(toolbar, (element) => element.type?.name === 'ToggleButton');
+  assert.equal(toggles.length, 3);
+  assert.equal(toggles[0].props.label, 'Dark');
+  assert.equal(toggles[0].props.value, true);
+  assert.equal(toggles[0].props.onChange, handlers.onDarkModeChange);
+  assert.equal(toggles[0].props.isDisabled, true);
+  assert.equal(toggles[1].props.label, 'Compact');
+  assert.equal(toggles[1].props.onChange, handlers.onCompactRowsChange);
+  assert.equal(toggles[2].props.label, 'Contrast');
+  assert.equal(toggles[2].props.onChange, handlers.onHighContrastSelectionChange);
 });
 
 test('formula editor renders spreadsheet edit controls and keeps callback contract wired', async () => {
