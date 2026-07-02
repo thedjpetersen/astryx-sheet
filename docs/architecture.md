@@ -25,7 +25,7 @@ This split lets a host start with the full sheet, then peel away pieces as its p
 
 ## Internal Layers
 
-- `src/app/` contains demo application wiring and Astryx theme registration.
+- `src/app/` contains demo application wiring and Astryx theme registration, including the default Astryx brand theme (`astryxTheme.js`, defined locally with `defineTheme`): near-black ink accents, cream body, Figtree typography, +4px radii, pill buttons, and a `--color-brand` blue reserved for the logo mark.
 - `src/spreadsheet/Spreadsheet.jsx` owns workbook interaction orchestration: scroll virtualization, selection, editing, resizing, formula bar state, sheet-tab commands, workbook metadata commands, and context menu actions. Workbook mutations route through the headless controller rather than direct engine command calls.
 - `src/spreadsheet/components/` contains replaceable UI pieces such as cells, row fragments, sheet tabs, the toolbar, function picker, and context menu.
 - `src/spreadsheet/engine/` contains the React-independent workbook core: sheets, sparse cells, a headless controller with calculation modes, persistence and journal helpers, commands, undo/redo, clipboard and fill helpers, sheet/workbook dependency graph utilities, and snapshot serialization.

@@ -157,6 +157,15 @@
 - Added engine tests for sparse bulk style/format commands, snapshot round trips, existing-cell override behavior, changed-key tracking, and large-sort rejection.
 - Updated the documentation around progressive adoption, including complete-sheet, controlled-sheet, headless-engine, and focused-primitive usage paths.
 
+## 2026-07-01
+
+- Restyled the sheet chrome to match the current Astryx design language after reviewing the design system's latest main branch and docsite brand recipe.
+- Added a locally defined Astryx brand theme (`src/app/astryxTheme.js`, built with `defineTheme`) and made it the default: warm near-black ink drives all accent tokens, cream body in light mode, Figtree typography, +4px radius bump, semibold display headings, pill buttons, and a `--color-brand` blue reserved for the logo.
+- Replaced the placeholder ✣ glyph with the real Astryx pinwheel mark (inline `currentColor` SVG) in the toolbar, the grid corner, and a new SVG favicon, painted with `var(--color-brand)`.
+- Tokenized the chrome stylesheet: `--text-*`/`--font-size-*`/`--font-weight-*` typography tokens, `--radius-*` radii with nested menu-item radius math, `--duration-fast` + `--ease-standard` motion, overlay hover/pressed states with press scale, standardized focus-visible rings, and a frosted (color-mix + backdrop blur) top bar.
+- Converted the fill/text/border swatch palettes and conditional-highlight styles from hardcoded Tailwind hexes to Astryx categorical tokens so applied cell colors now adapt to the active theme and dark mode.
+- Verified light mode, dark mode, popover menus, and the Y2K theme in a driven browser session; all 82 engine and UI tests pass.
+
 ## Current Direction
 
 The package should grow around two public layers:
