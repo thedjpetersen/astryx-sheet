@@ -111,7 +111,7 @@ export function EmbeddedSheet({onSave}) {
 - Defensive formula helpers including `IFERROR`, `IFNA`, `ISERROR`, `ISNA`, `ISBLANK`, `ISNUMBER`, `ISTEXT`, `ISEVEN`, `ISODD`, `ISFORMULA`, `FORMULATEXT`, `N`, `T`, `TYPE`, and `ERROR.TYPE`
 - Right-click context menu for edit, clear, copy, resize, and sample formula actions
 - Live inspector panel showing mounted cells, sparse overrides, effect-registered geometry, and approximate FPS
-- Demo options for theme selection (default: Neutral), dark mode, inspector visibility, compact row density, and high-contrast selection
+- Demo options for theme selection (default: Astryx), dark mode, inspector visibility, compact row density, and high-contrast selection
 - Embeddable source package exports for the React `Spreadsheet` component and a React-independent workbook engine
 - React `Spreadsheet` can own an internal headless controller or consume a host-provided `workbookController`
 - `onWorkbookChange` callback for host applications that need workbook state after cell, sheet, history, format, conditional format, filter, sort, clipboard, or resize commands

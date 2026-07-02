@@ -222,7 +222,7 @@ const styles = Object.freeze({
     flex: '0 0 auto',
     color: 'var(--color-text-blue)',
     fontSize: 12,
-    fontWeight: 800,
+    fontWeight: 700,
   },
   helpDescription: {
     minWidth: 0,
@@ -249,7 +249,7 @@ const styles = Object.freeze({
     backgroundColor: 'var(--color-accent-muted)',
     color: 'var(--color-text-accent)',
     fontFamily: 'var(--font-family-code)',
-    fontWeight: 800,
+    fontWeight: 700,
   },
   argumentDescription: {
     minWidth: 0,
@@ -312,7 +312,7 @@ const styles = Object.freeze({
     overflow: 'hidden',
     color: 'var(--color-text-blue)',
     fontSize: 12,
-    fontWeight: 800,
+    fontWeight: 700,
     whiteSpace: 'nowrap',
   },
   suggestionSignature: {
@@ -344,7 +344,7 @@ const styles = Object.freeze({
   sideTitle: {
     color: 'var(--color-text-primary)',
     fontSize: 12,
-    fontWeight: 800,
+    fontWeight: 700,
   },
   example: {
     minWidth: 0,
@@ -419,7 +419,7 @@ const styles = Object.freeze({
     color: 'inherit',
     fontFamily: 'var(--font-family-body)',
     fontSize: 10,
-    fontWeight: 800,
+    fontWeight: 700,
     lineHeight: 1,
     paddingBlock: 2,
     paddingInline: 5,

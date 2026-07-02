@@ -6,6 +6,7 @@ import {getTheme, registerThemeIcons} from '../app/themes.js';
 import {useControllableState} from '../hooks/useControllableState.js';
 import {useElementSize} from '../hooks/useElementSize.js';
 import {useRafCallback} from '../hooks/useRafCallback.js';
+import {AstryxMark} from './components/AstryxMark.jsx';
 import {FunctionPicker} from './components/FunctionPicker.jsx';
 import {NativeContextMenu} from './components/NativeContextMenu.jsx';
 import {RowFragment} from './components/RowFragment.jsx';
@@ -161,7 +162,7 @@ export function Spreadsheet({
   initialConditionalFormats,
   workbookController,
   getDefaultCellValue = defaultCellValue,
-  defaultThemeName = 'neutral',
+  defaultThemeName = 'astryx',
   themeName: controlledThemeName,
   onThemeNameChange,
   defaultDarkMode = false,
@@ -868,7 +869,7 @@ export function Spreadsheet({
         type: ConditionalFormatType.NUMBER,
         operator: 'gt',
         value,
-        style: {backgroundColor: '#d1fae5', color: '#064e3b', fontWeight: 600},
+        style: {backgroundColor: 'var(--color-background-green)', color: 'var(--color-text-green)', fontWeight: 600},
       },
       label: `Highlight ${rangeLabel}`,
     }, `Highlighted values above ${value}`, 'metadata');
@@ -890,7 +891,7 @@ export function Spreadsheet({
         type: ConditionalFormatType.TEXT,
         operator: 'contains',
         value,
-        style: {backgroundColor: '#fee2e2', color: '#7f1d1d', fontWeight: 600},
+        style: {backgroundColor: 'var(--color-background-red)', color: 'var(--color-text-red)', fontWeight: 600},
       },
       label: `Highlight text ${rangeLabel}`,
     }, `Highlighted text matches in ${rangeLabel}`, 'metadata');
@@ -1463,9 +1464,9 @@ export function Spreadsheet({
           onFormatDate={() => formatSelection({type: NumberFormatType.DATE}, 'date')}
           onApplyFormat={(format, label, replace) => formatSelection(format, label, replace)}
           onStyleBold={() => styleSelection({fontWeight: 700}, 'bold')}
-          onStyleBorder={() => styleSelection({border: '1px solid #64748b'}, 'border')}
-          onStyleFill={() => styleSelection({backgroundColor: '#e0f2fe'}, 'fill')}
-          onStyleText={() => styleSelection({color: '#075985'}, 'text color')}
+          onStyleBorder={() => styleSelection({border: '1px solid var(--color-border-gray)'}, 'border')}
+          onStyleFill={() => styleSelection({backgroundColor: 'var(--color-background-blue)'}, 'fill')}
+          onStyleText={() => styleSelection({color: 'var(--color-text-blue)'}, 'text color')}
           onApplyStyle={(style, label, replace) => styleSelection(style, label, replace)}
           onSortAscending={() => sortSelection('asc')}
           onSortDescending={() => sortSelection('desc')}
@@ -1520,7 +1521,7 @@ export function Spreadsheet({
       <main className="stage">
         <div className="sheet-workbench">
           <Card className="sheet-shell" padding={0}>
-            <div className="corner">✣</div>
+            <div className="corner"><AstryxMark size={14} /></div>
             <div className="column-header"><div className="header-layer" ref={headerLayerRef} style={{width: totalWidth, height: headerHeight}}>
               {columns.map((col) => {
                 const inSelection = committedSelection && !selectionIsWholeRow && col >= committedSelection.c1 && col <= committedSelection.c2;

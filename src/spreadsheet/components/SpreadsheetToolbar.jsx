@@ -38,35 +38,39 @@ import {
   UnfoldVertical,
 } from 'lucide-react';
 import {THEME_OPTIONS} from '../../app/themes.js';
+import {AstryxMark} from './AstryxMark.jsx';
 import {FormulaEditor} from './FormulaEditor.jsx';
 
 const iconProps = {size: 16, strokeWidth: 2, 'aria-hidden': true};
+// Hex fallbacks for the native color picker, which cannot resolve CSS vars.
 const DEFAULT_FILL_COLOR = '#e0f2fe';
 const DEFAULT_TEXT_COLOR = '#075985';
 const DEFAULT_BORDER_COLOR = '#64748b';
+// Preset swatches use the Astryx categorical tokens so applied cell colors
+// follow the active theme and dark mode instead of freezing one palette.
 const FILL_SWATCHES = [
-  {label: 'Blue', color: '#e0f2fe'},
-  {label: 'Green', color: '#dcfce7'},
-  {label: 'Yellow', color: '#fef3c7'},
-  {label: 'Red', color: '#fee2e2'},
-  {label: 'Purple', color: '#ede9fe'},
-  {label: 'Gray', color: '#f1f5f9'},
+  {label: 'Blue', color: 'var(--color-background-blue)'},
+  {label: 'Green', color: 'var(--color-background-green)'},
+  {label: 'Yellow', color: 'var(--color-background-yellow)'},
+  {label: 'Red', color: 'var(--color-background-red)'},
+  {label: 'Purple', color: 'var(--color-background-purple)'},
+  {label: 'Gray', color: 'var(--color-background-gray)'},
 ];
 const TEXT_SWATCHES = [
-  {label: 'Blue', color: '#075985'},
-  {label: 'Green', color: '#166534'},
-  {label: 'Red', color: '#991b1b'},
-  {label: 'Purple', color: '#6d28d9'},
-  {label: 'Slate', color: '#334155'},
-  {label: 'Black', color: '#0f172a'},
+  {label: 'Blue', color: 'var(--color-text-blue)'},
+  {label: 'Green', color: 'var(--color-text-green)'},
+  {label: 'Red', color: 'var(--color-text-red)'},
+  {label: 'Purple', color: 'var(--color-text-purple)'},
+  {label: 'Gray', color: 'var(--color-text-gray)'},
+  {label: 'Ink', color: 'var(--color-text-primary)'},
 ];
 const BORDER_SWATCHES = [
-  {label: 'Slate', color: '#64748b'},
-  {label: 'Black', color: '#0f172a'},
-  {label: 'Blue', color: '#0284c7'},
-  {label: 'Green', color: '#16a34a'},
-  {label: 'Red', color: '#dc2626'},
-  {label: 'Amber', color: '#d97706'},
+  {label: 'Gray', color: 'var(--color-border-gray)'},
+  {label: 'Ink', color: 'var(--color-border-emphasized)'},
+  {label: 'Blue', color: 'var(--color-border-blue)'},
+  {label: 'Green', color: 'var(--color-border-green)'},
+  {label: 'Red', color: 'var(--color-border-red)'},
+  {label: 'Orange', color: 'var(--color-border-orange)'},
 ];
 
 function icon(IconComponent, size = 16) {
@@ -384,7 +388,7 @@ export function SpreadsheetToolbar({
 }) {
   return (
     <header className="topbar">
-      <div className="brand-mark">✣</div>
+      <div className="brand-mark"><AstryxMark size={22} /></div>
       <div className="title">
         <Heading level={1}>{title}</Heading>
         {subtitle ? <Text type="supporting" display="block">{subtitle}</Text> : null}
@@ -483,11 +487,11 @@ export function SpreadsheetToolbar({
           <RibbonMenu label="Bold" icon={icon(Bold)}>
             <RibbonMenuItem label="Bold" icon={icon(Bold)} onSelect={onStyleBold} />
             <RibbonMenuItem label="Normal weight" icon={icon(Type)} onSelect={() => onApplyStyle?.({fontWeight: null}, 'normal weight')} />
-            <RibbonMenuItem label="Header emphasis" icon={icon(Bold)} onSelect={() => onApplyStyle?.({fontWeight: 700, backgroundColor: '#f1f5f9'}, 'header emphasis')} />
+            <RibbonMenuItem label="Header emphasis" icon={icon(Bold)} onSelect={() => onApplyStyle?.({fontWeight: 700, backgroundColor: 'var(--color-background-muted)'}, 'header emphasis')} />
           </RibbonMenu>
           <RibbonMenu label="Border" icon={icon(Square)}>
             <RibbonMenuItem label="All borders" icon={icon(Square)} onSelect={onStyleBorder} />
-            <RibbonMenuItem label="Dark borders" icon={icon(Square)} onSelect={() => onApplyStyle?.({border: '1px solid #0f172a'}, 'dark border')} />
+            <RibbonMenuItem label="Dark borders" icon={icon(Square)} onSelect={() => onApplyStyle?.({border: '1px solid var(--color-border-emphasized)'}, 'dark border')} />
             <RibbonMenuItem label="No borders" icon={icon(Square)} onSelect={() => onApplyStyle?.({border: null}, 'no border')} />
             <RibbonColorControl
               label="Border color"
@@ -498,9 +502,9 @@ export function SpreadsheetToolbar({
               onClear={() => onApplyStyle?.({border: null}, 'no border')} />
           </RibbonMenu>
           <RibbonMenu label="Fill" icon={icon(PaintBucket)}>
-            <RibbonMenuItem label="Light blue" swatch="#e0f2fe" onSelect={onStyleFill} />
-            <RibbonMenuItem label="Soft green" swatch="#dcfce7" onSelect={() => onApplyStyle?.({backgroundColor: '#dcfce7'}, 'green fill')} />
-            <RibbonMenuItem label="Warm yellow" swatch="#fef3c7" onSelect={() => onApplyStyle?.({backgroundColor: '#fef3c7'}, 'yellow fill')} />
+            <RibbonMenuItem label="Blue fill" swatch="var(--color-background-blue)" onSelect={onStyleFill} />
+            <RibbonMenuItem label="Green fill" swatch="var(--color-background-green)" onSelect={() => onApplyStyle?.({backgroundColor: 'var(--color-background-green)'}, 'green fill')} />
+            <RibbonMenuItem label="Yellow fill" swatch="var(--color-background-yellow)" onSelect={() => onApplyStyle?.({backgroundColor: 'var(--color-background-yellow)'}, 'yellow fill')} />
             <RibbonMenuItem label="Clear fill" swatch="transparent" onSelect={() => onApplyStyle?.({backgroundColor: null}, 'clear fill')} />
             <RibbonColorControl
               label="Fill color"
@@ -511,9 +515,9 @@ export function SpreadsheetToolbar({
               onClear={() => onApplyStyle?.({backgroundColor: null}, 'clear fill')} />
           </RibbonMenu>
           <RibbonMenu label="Text color" icon={icon(Type)}>
-            <RibbonMenuItem label="Blue text" swatch="#075985" onSelect={onStyleText} />
-            <RibbonMenuItem label="Green text" swatch="#166534" onSelect={() => onApplyStyle?.({color: '#166534'}, 'green text')} />
-            <RibbonMenuItem label="Red text" swatch="#991b1b" onSelect={() => onApplyStyle?.({color: '#991b1b'}, 'red text')} />
+            <RibbonMenuItem label="Blue text" swatch="var(--color-text-blue)" onSelect={onStyleText} />
+            <RibbonMenuItem label="Green text" swatch="var(--color-text-green)" onSelect={() => onApplyStyle?.({color: 'var(--color-text-green)'}, 'green text')} />
+            <RibbonMenuItem label="Red text" swatch="var(--color-text-red)" onSelect={() => onApplyStyle?.({color: 'var(--color-text-red)'}, 'red text')} />
             <RibbonMenuItem label="Default text" swatch="transparent" onSelect={() => onApplyStyle?.({color: null}, 'default text')} />
             <RibbonColorControl
               label="Custom text color"

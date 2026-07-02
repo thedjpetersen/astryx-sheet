@@ -277,7 +277,7 @@ test('spreadsheet toolbar rich command controls are wired to their callbacks', a
     ['Bold', 'onStyleBold'],
     ['Normal weight', 'onApplyStyle'],
     ['All borders', 'onStyleBorder'],
-    ['Light blue', 'onStyleFill'],
+    ['Blue fill', 'onStyleFill'],
     ['Blue text', 'onStyleText'],
     ['Row above', 'onInsertRowAbove'],
     ['Row below', 'onInsertRowBelow'],
