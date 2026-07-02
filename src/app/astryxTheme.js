@@ -56,3 +56,8 @@ export const astryxTheme = defineTheme({
     },
   },
 });
+
+// The theme CSS is pre-compiled to ./astryxTheme.css (imported by styles.css)
+// via `npm run build:theme`, so the Theme component skips runtime <style>
+// injection. Re-run the script whenever the tokens above change.
+astryxTheme.__built = true;
