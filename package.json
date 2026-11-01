@@ -33,19 +33,19 @@
   "author": "DJ Petersen",
   "license": "MIT",
   "dependencies": {
-    "@astryxdesign/core": "^0.7.1",
-    "@astryxdesign/theme-butter": "^0.7.1",
-    "@astryxdesign/theme-chocolate": "^0.7.1",
-    "@astryxdesign/theme-gothic": "^0.7.1",
-    "@astryxdesign/theme-matcha": "^0.7.1",
-    "@astryxdesign/theme-neutral": "^0.7.1",
-    "@astryxdesign/theme-stone": "^0.7.1",
-    "@astryxdesign/theme-y2k": "^0.7.1",
+    "@astryxdesign/core": "^0.7.5",
+    "@astryxdesign/theme-butter": "^0.7.5",
+    "@astryxdesign/theme-chocolate": "^0.7.5",
+    "@astryxdesign/theme-gothic": "^0.7.5",
+    "@astryxdesign/theme-matcha": "^0.7.5",
+    "@astryxdesign/theme-neutral": "^0.7.5",
+    "@astryxdesign/theme-stone": "^0.7.5",
+    "@astryxdesign/theme-y2k": "^0.7.5",
     "@stylexjs/stylex": "^0.19.1",
-    "@vitejs/plugin-react": "latest",
-    "lucide-react": "^1.59.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "lucide-react": "^1.66.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "vite": "latest"
+    "vite": "^8.3.5"
   }
 }
